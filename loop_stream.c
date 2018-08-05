@@ -36,54 +36,54 @@ struct loop_stream_s {
 	void			*app_data;
 };
 
-static void __loop_stream_close(loop_stream_t *s, const char *reason, int errnum);
+static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errnum);
 
 /* timer utils */
-static void __loop_stream_read_timeout(loop_timer_t *timer)
+static void loop_stream_read_timeout(loop_timer_t *timer)
 {
 	loop_stream_t *s = wuy_containerof(timer, loop_stream_t, timer_read);
-	__loop_stream_close(s, "read timedout", 0);
+	loop_stream_close_for(s, "read timedout", 0);
 }
-static void __loop_stream_write_timeout(loop_timer_t *timer)
+static void loop_stream_write_timeout(loop_timer_t *timer)
 {
 	loop_stream_t *s = wuy_containerof(timer, loop_stream_t, timer_write);
-	__loop_stream_close(s, "write timedout", 0);
+	loop_stream_close_for(s, "write timedout", 0);
 }
-static void __loop_stream_set_timer_read(loop_stream_t *s)
+static void loop_stream_set_timer_read(loop_stream_t *s)
 {
 	loop_timer_add(s->loop, &s->timer_read, s->ops->tmo_read,
-			__loop_stream_read_timeout);
+			loop_stream_read_timeout);
 }
-static void __loop_stream_set_timer_write(loop_stream_t *s)
+static void loop_stream_set_timer_write(loop_stream_t *s)
 {
 	loop_timer_add(s->loop, &s->timer_write, s->ops->tmo_write,
-			__loop_stream_write_timeout);
+			loop_stream_write_timeout);
 }
-static void __loop_stream_del_timer_read(loop_stream_t *s)
+static void loop_stream_del_timer_read(loop_stream_t *s)
 {
 	loop_timer_delete(s->loop, &s->timer_read);
 }
-static void __loop_stream_del_timer_write(loop_stream_t *s)
+static void loop_stream_del_timer_write(loop_stream_t *s)
 {
 	loop_timer_delete(s->loop, &s->timer_write);
 }
 
 /* event utils */
-static void __loop_stream_set_event_read(loop_stream_t *s)
+static void loop_stream_set_event_read(loop_stream_t *s)
 {
 	wuy_event_add_read(s->loop->event_ctx, s->fd, s, &s->event_status);
 }
-static void __loop_stream_set_event_write(loop_stream_t *s)
+static void loop_stream_set_event_write(loop_stream_t *s)
 {
 	wuy_event_add_write(s->loop->event_ctx, s->fd, s, &s->event_status);
 }
-static void __loop_stream_del_event_write(loop_stream_t *s)
+static void loop_stream_del_event_write(loop_stream_t *s)
 {
 	wuy_event_del_write(s->loop->event_ctx, s->fd, s, &s->event_status);
 }
 
 
-static void __loop_stream_close(loop_stream_t *s, const char *reason, int errnum)
+static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errnum)
 {
 	if (s->closed) {
 		return;
@@ -100,13 +100,13 @@ static void __loop_stream_close(loop_stream_t *s, const char *reason, int errnum
 
 	free(s->read_buffer);
 
-	__loop_stream_del_timer_read(s);
-	__loop_stream_del_timer_write(s);
+	loop_stream_del_timer_read(s);
+	loop_stream_del_timer_write(s);
 
 	wuy_list_add(&s->list_node, &s->loop->stream_defer_head);
 }
 
-static void __loop_stream_clear_defer(void *data)
+static void loop_stream_clear_defer(void *data)
 {
 	wuy_list_head_t *head = data;
 	wuy_list_head_t *node, *safe;
@@ -116,7 +116,7 @@ static void __loop_stream_clear_defer(void *data)
 	}
 }
 
-static void __loop_stream_readable(loop_stream_t *s)
+static void loop_stream_readable(loop_stream_t *s)
 {
 	uint8_t buffer[s->ops->bufsz_read];
 
@@ -129,15 +129,15 @@ static void __loop_stream_readable(loop_stream_t *s)
 			s->ops->bufsz_read - s->read_buf_len);
 	if (read_len < 0) {
 		if (errno == EAGAIN) {
-			__loop_stream_set_event_read(s);
-			__loop_stream_set_timer_read(s);
+			loop_stream_set_event_read(s);
+			loop_stream_set_timer_read(s);
 			return;
 		}
-		__loop_stream_close(s, "read error", errno);
+		loop_stream_close_for(s, "read error", errno);
 		return;
 	}
 	if (read_len == 0) {
-		__loop_stream_close(s, "peer close", 0);
+		loop_stream_close_for(s, "peer close", 0);
 		return;
 	}
 
@@ -145,12 +145,12 @@ static void __loop_stream_readable(loop_stream_t *s)
 	read_len += s->read_buf_len;
 	ssize_t proc_len = s->ops->on_read(s, buffer, read_len);
 	if (proc_len < 0) {
-		__loop_stream_close(s, "app read error", 0);
+		loop_stream_close_for(s, "app read error", 0);
 		return;
 	}
 	if (proc_len == 0) {
 		if (read_len == s->ops->bufsz_read) {
-			__loop_stream_close(s, "read buffer full", 0);
+			loop_stream_close_for(s, "read buffer full", 0);
 			return;
 		}
 	} else if (proc_len < read_len) {
@@ -168,42 +168,42 @@ static void __loop_stream_readable(loop_stream_t *s)
 	}
 
 	/* tail recursive for read loop */
-	__loop_stream_readable(s);
+	loop_stream_readable(s);
 }
 
-void __loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
+void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 {
 	if (s->closed) {
 		return;
 	}
 	if (readable) {
-		__loop_stream_readable(s);
+		loop_stream_readable(s);
 	}
 	if (writable) {
 		s->ops->on_writable(s);
 	}
 }
 
-static ssize_t __loop_stream_write_handle(loop_stream_t *s, size_t data_len, ssize_t write_len)
+static ssize_t loop_stream_write_handle(loop_stream_t *s, size_t data_len, ssize_t write_len)
 {
 	if (write_len < 0 && errno != EAGAIN) {
-		__loop_stream_close(s, "write error", errno);
+		loop_stream_close_for(s, "write error", errno);
 		return write_len;
 	}
 	if (write_len == data_len) {
-		__loop_stream_del_event_write(s);
-		__loop_stream_del_timer_write(s);
+		loop_stream_del_event_write(s);
+		loop_stream_del_timer_write(s);
 		return write_len;
 	}
 
 	/* set write-block */
 
 	if (s->ops->on_writable == NULL) {
-		__loop_stream_close(s, "write blocks", errno);
+		loop_stream_close_for(s, "write blocks", errno);
 		return -1;
 	}
-	__loop_stream_set_event_write(s);
-	__loop_stream_set_timer_write(s);
+	loop_stream_set_event_write(s);
+	loop_stream_set_timer_write(s);
 	return write_len;
 }
 
@@ -213,7 +213,7 @@ ssize_t loop_stream_write(loop_stream_t *s, const void *data, size_t len)
 		return -1;
 	}
 	ssize_t write_len = write(s->fd, data, len);
-	return __loop_stream_write_handle(s, len, write_len);
+	return loop_stream_write_handle(s, len, write_len);
 }
 
 ssize_t loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, size_t len)
@@ -222,7 +222,7 @@ ssize_t loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, size_t 
 		return -1;
 	}
 	ssize_t write_len = sendfile(s->fd, in_fd, offset, len);
-	return __loop_stream_write_handle(s, len, write_len);
+	return loop_stream_write_handle(s, len, write_len);
 }
 
 loop_stream_t *loop_stream_add(loop_t *loop, int fd, loop_stream_ops_t *ops)
@@ -244,24 +244,24 @@ loop_stream_t *loop_stream_add(loop_t *loop, int fd, loop_stream_ops_t *ops)
 	}
 
 	/* read it to add event and timer */
-	__loop_stream_readable(s);
+	loop_stream_readable(s);
 
 	return s;
 }
 
 void loop_stream_close(loop_stream_t *s)
 {
-	__loop_stream_close(s, "app close", 0);
+	loop_stream_close_for(s, "app close", 0);
 }
 
-void __loop_stream_init(loop_t *loop)
+void loop_stream_init(loop_t *loop)
 {
 	loop->stream_pool = wuy_pool_new_type(loop_stream_t);
 	assert(loop->stream_pool != NULL);
 
 	wuy_list_init(&loop->stream_defer_head);
 
-	loop_idle_add(loop, __loop_stream_clear_defer, &loop->stream_defer_head);
+	loop_idle_add(loop, loop_stream_clear_defer, &loop->stream_defer_head);
 }
 
 int loop_stream_fd(loop_stream_t *s)

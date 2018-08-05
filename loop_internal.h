@@ -16,20 +16,20 @@
 #define LOOP_TYPE_INOTIFY	103
 
 /* idle */
-typedef struct __loop_idle_s __loop_idle_t;
-void __loop_idle_run(loop_t *loop);
+typedef struct loop_idle_s loop_idle_t;
+void loop_idle_run(loop_t *loop);
 
 /* stream */
-void __loop_stream_init(loop_t *loop);
-void __loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable);
+void loop_stream_init(loop_t *loop);
+void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable);
 
 /* tcp_listen */
-void __loop_tcp_listen_acceptable(loop_tcp_listen_t *tl);
+void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl);
 
 /* timer */
-typedef wuy_heap_t __loop_timer_ctx_t;
-void __loop_timer_init(loop_t *loop);
-int64_t __loop_timer_expire(__loop_timer_ctx_t *ctx);
+typedef wuy_heap_t loop_timer_ctx_t;
+void loop_timer_init(loop_t *loop);
+int64_t loop_timer_expire(loop_timer_ctx_t *ctx);
 
 /* loop_t */
 struct loop_s {
@@ -40,11 +40,11 @@ struct loop_s {
 	wuy_pool_t		*stream_pool;
 	wuy_list_head_t		stream_defer_head;
 
-	__loop_timer_ctx_t	*timer_ctx;
+	loop_timer_ctx_t	*timer_ctx;
 
 	int			idle_count;
 	int			idle_capacity;
-	__loop_idle_t		*idle_funcs;
+	loop_idle_t		*idle_funcs;
 };
 
 #endif

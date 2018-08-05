@@ -6,7 +6,7 @@
 #include "loop_internal.h"
 #include "loop.h"
 
-void __loop_timer_init(loop_t *loop)
+void loop_timer_init(loop_t *loop)
 {
 	loop->timer_ctx = wuy_heap_new_type(offsetof(loop_timer_t, heap_node),
 			WUY_HEAP_KEY_INT64, offsetof(loop_timer_t, expire), false);
@@ -33,7 +33,7 @@ void loop_timer_delete(loop_t *loop, loop_timer_t *timer)
 	wuy_heap_delete(loop->timer_ctx, timer);
 }
 
-int64_t __loop_timer_expire(__loop_timer_ctx_t *ctx)
+int64_t loop_timer_expire(loop_timer_ctx_t *ctx)
 {
 	int64_t now_ms = __now_ms();
 	while (1) {

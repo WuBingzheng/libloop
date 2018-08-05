@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <sys/socket.h>
 
 
 /* loop */
@@ -40,11 +39,20 @@ void loop_stream_idle(loop_stream_t *, int timeout);
 int loop_stream_fd(loop_stream_t *s);
 
 /* loop.tcp_listen */
+#include <sys/socket.h>
 typedef struct loop_tcp_listen_s loop_tcp_listen_t;
 loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, struct sockaddr *addr,
-		loop_stream_ops_t *ops);
+		loop_stream_ops_t *accepted_ops);
 
 /* loop.inotify */
+#include <sys/inotify.h>
+typedef struct loop_inotify_s loop_inotify_t;
+typedef struct loop_inotify_ops_s loop_inotify_ops_t;
+struct loop_inotify_ops_s {
+	loop_inotify_ops_t *(*on_notify)(loop_inotify_t *, const struct inotify_event *);
+	uint32_t	mask;
+	int		tmo_idle;
+};
 
 /* loop.timer */
 typedef struct loop_timer_s loop_timer_t;
