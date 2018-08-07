@@ -18,7 +18,7 @@ struct loop_stream_s {
 
 	int			fd;
 
-	unsigned		closed:1;
+	bool			closed;
 
 	wuy_event_status_t	event_status;
 
@@ -88,7 +88,7 @@ static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errn
 	if (s->closed) {
 		return;
 	}
-	s->closed = 1;
+	s->closed = true;
 
 	printf("tcploop connection close: %s %s\n", reason, errnum?strerror(errnum):"");
 
@@ -108,9 +108,8 @@ static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errn
 
 static void loop_stream_clear_defer(void *data)
 {
-	wuy_list_head_t *head = data;
-	wuy_list_head_t *node, *safe;
-	wuy_list_iter_safe(node, safe, head) {
+	wuy_list_head_t *node, *head = data;
+	wuy_list_iter_first(node, head) {
 		wuy_list_delete(node);
 		wuy_pool_free(wuy_containerof(node, loop_stream_t, list_node));
 	}
@@ -257,7 +256,6 @@ void loop_stream_close(loop_stream_t *s)
 void loop_stream_init(loop_t *loop)
 {
 	loop->stream_pool = wuy_pool_new_type(loop_stream_t);
-	assert(loop->stream_pool != NULL);
 
 	wuy_list_init(&loop->stream_defer_head);
 

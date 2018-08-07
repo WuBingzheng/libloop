@@ -47,12 +47,15 @@ loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, struct sockaddr *addr,
 /* loop.inotify */
 #include <sys/inotify.h>
 typedef struct loop_inotify_s loop_inotify_t;
-typedef struct loop_inotify_ops_s loop_inotify_ops_t;
-struct loop_inotify_ops_s {
-	loop_inotify_ops_t *(*on_notify)(loop_inotify_t *, const struct inotify_event *);
+typedef struct {
+	void (*on_notify)(loop_inotify_t *, const struct inotify_event *);
+	void (*on_inside)(loop_inotify_t *, uint32_t mask, uint32_t cookie);
 	uint32_t	mask;
-	int		tmo_idle;
-};
+} loop_inotify_ops_t;
+
+loop_inotify_t *loop_inotify_add(loop_t *loop, const char *pathname,
+		loop_inotify_ops_t *ops);
+void loop_inotify_delete(loop_inotify_t *in);
 
 /* loop.timer */
 typedef struct loop_timer_s loop_timer_t;

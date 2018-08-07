@@ -22,9 +22,9 @@ static void loop_event_handler(void *data, bool readable, bool writable)
 	case LOOP_TYPE_STREAM:
 		loop_stream_event_handler(data, readable, writable);
 		break;
-//	case LOOP_TYPE_INOTIFY:
-//		loop_inotify_event_handler(data);
-//		break;
+	case LOOP_TYPE_INOTIFY:
+		loop_inotify_event_handler(data);
+		break;
 	default:
 		abort();
 	}
@@ -44,7 +44,7 @@ loop_t *loop_new(void)
 
 	loop_stream_init(loop);
 
-	// loop_inotify_init(loop);
+	loop_inotify_init(loop);
 
 	return loop;
 }
@@ -56,11 +56,11 @@ int loop_run(loop_t *loop)
 		/* call loop_event_handler() to handle events */
 		wuy_event_run(loop->event_ctx, timeout);
 
-		/* expire and get the latest timeout */
-		timeout = loop_timer_expire(loop->timer_ctx);
-
 		/* idle functions */
 		loop_idle_run(loop);
+
+		/* expire and get the latest timeout */
+		timeout = loop_timer_expire(loop->timer_ctx);
 	}
 	return 0;
 }

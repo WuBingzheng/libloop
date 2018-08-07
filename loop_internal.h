@@ -6,6 +6,7 @@
 #include "wuy_heap.h"
 #include "wuy_pool.h"
 #include "wuy_list.h"
+#include "wuy_dict.h"
 #include "wuy_event.h"
 
 #include "loop.h"
@@ -31,6 +32,10 @@ typedef wuy_heap_t loop_timer_ctx_t;
 void loop_timer_init(loop_t *loop);
 int64_t loop_timer_expire(loop_timer_ctx_t *ctx);
 
+/* inotify */
+void loop_inotify_init(loop_t *loop);
+void loop_inotify_event_handler(void *data);
+
 /* loop_t */
 struct loop_s {
 	unsigned		quit:1;
@@ -41,6 +46,12 @@ struct loop_s {
 	wuy_list_head_t		stream_defer_head;
 
 	loop_timer_ctx_t	*timer_ctx;
+
+	int			inotify_fd;
+	wuy_pool_t		*inotify_pool;
+	wuy_dict_t		*wd_inotify;
+	wuy_dict_t		*inside_inotify;
+	wuy_list_head_t		inotify_defer_head;
 
 	int			idle_count;
 	int			idle_capacity;
