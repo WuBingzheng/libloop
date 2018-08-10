@@ -29,7 +29,7 @@ struct loop_stream_s {
 	void			*read_buffer;
 	size_t			read_buf_len;
 
-	wuy_list_head_t		list_node;
+	wuy_list_node_t		list_node;
 
 	loop_stream_ops_t	*ops;
 
@@ -110,13 +110,14 @@ static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errn
 	loop_stream_del_timer_read(s);
 	loop_stream_del_timer_write(s);
 
-	wuy_list_add(&s->list_node, &s->loop->stream_defer_head);
+	wuy_list_insert(&s->loop->stream_defer_head, &s->list_node);
 }
 
 static void loop_stream_clear_defer(void *data)
 {
-	wuy_list_head_t *node, *head = data;
-	wuy_list_iter_first(node, head) {
+	wuy_list_t *head = data;
+	wuy_list_node_t *node;
+	wuy_list_iter_first(head, node) {
 		wuy_list_delete(node);
 		wuy_pool_free(wuy_containerof(node, loop_stream_t, list_node));
 	}

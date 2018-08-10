@@ -43,7 +43,7 @@ struct loop_s {
 	wuy_event_ctx_t		*event_ctx;
 
 	wuy_pool_t		*stream_pool;
-	wuy_list_head_t		stream_defer_head;
+	wuy_list_t		stream_defer_head;
 
 	wuy_pool_t		*timer_pool;
 	loop_timer_ctx_t	*timer_ctx;
@@ -52,7 +52,7 @@ struct loop_s {
 	wuy_pool_t		*inotify_pool;
 	wuy_dict_t		*wd_inotify;
 	wuy_dict_t		*inside_inotify;
-	wuy_list_head_t		inotify_defer_head;
+	wuy_list_t		inotify_defer_head;
 
 	int			idle_count;
 	int			idle_capacity;

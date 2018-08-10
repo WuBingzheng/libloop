@@ -19,8 +19,8 @@ struct loop_inotify_s {
 	loop_inotify_ops_t	*ops;
 
 	wuy_dict_node_t		dict_node;
-	wuy_list_head_t		list_node;
-	wuy_list_head_t		inside_head;
+	wuy_list_node_t		list_node;
+	wuy_list_t		inside_head;
 
 	void			*app_data;
 };
@@ -47,7 +47,7 @@ static loop_inotify_t *loop_inotify_inside_get(loop_inotify_t *parent, char *nam
 	inside->wd = -1;
 	inside->app_data = NULL;
 
-	wuy_list_add(&inside->list_node, &parent->inside_head);
+	wuy_list_insert(&parent->inside_head, &inside->list_node);
 	wuy_dict_add(loop->inside_inotify, inside);
 	return inside;
 }
@@ -152,21 +152,22 @@ void loop_inotify_delete(loop_inotify_t *in)
 		inotify_rm_watch(loop->inotify_fd, in->wd);
 		wuy_dict_delete(loop->wd_inotify, in);
 
-		wuy_list_head_t *n;
-		wuy_list_iter(n, &in->inside_head) {
+		wuy_list_node_t *n;
+		wuy_list_iter(&in->inside_head, n) {
 			loop_inotify_delete(wuy_containerof(n, loop_inotify_t, list_node));
 		}
 	} else {
 		wuy_list_delete(&in->list_node);
 	}
 
-	wuy_list_add(&in->list_node, &loop->inotify_defer_head);
+	wuy_list_insert(&loop->inotify_defer_head, &in->list_node);
 }
 
 static void loop_inotify_clear_defer(void *data)
 {
-	wuy_list_head_t *node, *head = data;
-	wuy_list_iter_first(node, head) {
+	wuy_list_t *head = data;
+	wuy_list_node_t *node;
+	wuy_list_iter_first(head, node) {
 		wuy_list_delete(node);
 		wuy_pool_free(wuy_containerof(node, loop_inotify_t, list_node));
 	}
