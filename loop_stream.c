@@ -23,8 +23,8 @@ struct loop_stream_s {
 
 	wuy_event_status_t	event_status;
 
-	loop_timer_t		timer_read;
-	loop_timer_t		timer_write;
+	loop_timer_t		*timer_read;
+	loop_timer_t		*timer_write;
 
 	void			*read_buffer;
 	size_t			read_buf_len;
@@ -40,33 +40,39 @@ struct loop_stream_s {
 static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errnum);
 
 /* timer utils */
-static void loop_stream_read_timeout(loop_timer_t *timer)
+static void loop_stream_read_timeout(int64_t at, void *data)
 {
-	loop_stream_t *s = wuy_containerof(timer, loop_stream_t, timer_read);
+	loop_stream_t *s = data;
 	loop_stream_close_for(s, "read timedout", 0);
 }
-static void loop_stream_write_timeout(loop_timer_t *timer)
+static void loop_stream_write_timeout(int64_t at, void *data)
 {
-	loop_stream_t *s = wuy_containerof(timer, loop_stream_t, timer_write);
+	loop_stream_t *s = data;
 	loop_stream_close_for(s, "write timedout", 0);
 }
 static void loop_stream_set_timer_read(loop_stream_t *s)
 {
-	loop_timer_add(s->loop, &s->timer_read, s->ops->tmo_read,
-			loop_stream_read_timeout);
+	if (s->timer_read == NULL) {
+		s->timer_read = loop_timer_new(s->loop, loop_stream_read_timeout, s);
+	}
+	loop_timer_set_after(s->loop, s->timer_read, s->ops->tmo_read);
 }
 static void loop_stream_set_timer_write(loop_stream_t *s)
 {
-	loop_timer_add(s->loop, &s->timer_write, s->ops->tmo_write,
-			loop_stream_write_timeout);
+	if (s->timer_write == NULL) {
+		s->timer_write = loop_timer_new(s->loop, loop_stream_write_timeout, s);
+	}
+	loop_timer_set_after(s->loop, s->timer_write, s->ops->tmo_write);
 }
 static void loop_stream_del_timer_read(loop_stream_t *s)
 {
-	loop_timer_delete(s->loop, &s->timer_read);
+	loop_timer_delete(s->loop, s->timer_read);
+	s->timer_read = NULL;
 }
 static void loop_stream_del_timer_write(loop_stream_t *s)
 {
-	loop_timer_delete(s->loop, &s->timer_write);
+	loop_timer_delete(s->loop, s->timer_write);
+	s->timer_write = NULL;
 }
 
 /* event utils */

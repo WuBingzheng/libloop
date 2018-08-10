@@ -45,6 +45,7 @@ struct loop_s {
 	wuy_pool_t		*stream_pool;
 	wuy_list_head_t		stream_defer_head;
 
+	wuy_pool_t		*timer_pool;
 	loop_timer_ctx_t	*timer_ctx;
 
 	int			inotify_fd;

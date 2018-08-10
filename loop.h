@@ -62,19 +62,12 @@ loop_inotify_t *loop_inotify_add(loop_t *loop, const char *pathname,
 void loop_inotify_delete(loop_inotify_t *in);
 
 /* loop.timer */
+typedef void loop_timer_f(int64_t at, void *data);
 typedef struct loop_timer_s loop_timer_t;
 
-typedef void loop_timer_handler_f(loop_timer_t *);
-
-#include "wuy_heap.h"
-struct loop_timer_s {
-	int64_t			expire;
-	wuy_heap_node_t		heap_node;
-	loop_timer_handler_f	*handler;
-};
-
-bool loop_timer_add(loop_t *loop, loop_timer_t *timer,
-		int64_t timeout_ms, loop_timer_handler_f *handler);
+loop_timer_t *loop_timer_new(loop_t *loop, loop_timer_f *handler, void *data);
+bool loop_timer_set_at(loop_t *loop, loop_timer_t *timer, int64_t at);
+bool loop_timer_set_after(loop_t *loop, loop_timer_t *timer, int64_t after);
 void loop_timer_delete(loop_t *loop, loop_timer_t *timer);
 
 #endif

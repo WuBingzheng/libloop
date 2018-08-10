@@ -4,7 +4,6 @@
 #include <stdlib.h>
 
 #include "wuy_event.h"
-#include "wuy_timer.h"
 #include "wuy_pool.h"
 #include "wuy_list.h"
 
