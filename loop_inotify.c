@@ -143,9 +143,19 @@ void loop_inotify_delete(loop_inotify_t *in)
 	}
 	in->closed = true;
 
+	if (in->ops->on_delete != NULL) {
+		in->ops->on_delete(in);
+	}
+
 	loop_t *loop = in->loop;
 	if (in->parent == NULL) {
 		inotify_rm_watch(loop->inotify_fd, in->wd);
+		wuy_dict_delete(loop->wd_inotify, in);
+
+		wuy_list_head_t *n;
+		wuy_list_iter(n, &in->inside_head) {
+			loop_inotify_delete(wuy_containerof(n, loop_inotify_t, list_node));
+		}
 	} else {
 		wuy_list_delete(&in->list_node);
 	}
@@ -157,26 +167,8 @@ static void loop_inotify_clear_defer(void *data)
 {
 	wuy_list_head_t *node, *head = data;
 	wuy_list_iter_first(node, head) {
-		loop_inotify_t *in = wuy_containerof(node,
-				loop_inotify_t, list_node);
-
-		loop_t *loop = in->loop;
-		if (in->parent == NULL) {
-			wuy_dict_delete(loop->wd_inotify, in);
-
-			wuy_list_head_t *n;
-			wuy_list_iter(n, &in->inside_head) {
-				loop_inotify_t *inside = wuy_containerof(n,
-						loop_inotify_t, list_node);
-				wuy_dict_delete(loop->inside_inotify, inside);
-				wuy_pool_free(inside);
-			}
-		} else {
-			wuy_dict_delete(loop->inside_inotify, in);
-		}
-
 		wuy_list_delete(node);
-		wuy_pool_free(in);
+		wuy_pool_free(wuy_containerof(node, loop_inotify_t, list_node));
 	}
 }
 

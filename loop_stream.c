@@ -19,6 +19,7 @@ struct loop_stream_s {
 	int			fd;
 
 	bool			closed;
+	bool			write_blocked;
 
 	wuy_event_status_t	event_status;
 
@@ -179,6 +180,7 @@ void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 		loop_stream_readable(s);
 	}
 	if (writable) {
+		s->write_blocked = false;
 		s->ops->on_writable(s);
 	}
 }
@@ -197,19 +199,24 @@ static ssize_t loop_stream_write_handle(loop_stream_t *s, size_t data_len, ssize
 
 	/* set write-block */
 
+	s->write_blocked = true;
+
 	if (s->ops->on_writable == NULL) {
 		loop_stream_close_for(s, "write blocks", errno);
 		return -1;
 	}
 	loop_stream_set_event_write(s);
 	loop_stream_set_timer_write(s);
-	return write_len;
+	return write_len < 0 ? 0 : write_len;
 }
 
 ssize_t loop_stream_write(loop_stream_t *s, const void *data, size_t len)
 {
 	if (s->closed) {
 		return -1;
+	}
+	if (s->write_blocked) {
+		return 0;
 	}
 	ssize_t write_len = write(s->fd, data, len);
 	return loop_stream_write_handle(s, len, write_len);
@@ -219,6 +226,9 @@ ssize_t loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, size_t 
 {
 	if (s->closed) {
 		return -1;
+	}
+	if (s->write_blocked) {
+		return 0;
 	}
 	ssize_t write_len = sendfile(s->fd, in_fd, offset, len);
 	return loop_stream_write_handle(s, len, write_len);

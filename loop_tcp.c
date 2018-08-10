@@ -3,6 +3,7 @@
 #include <strings.h>
 
 #include "wuy_tcp.h"
+#include "wuy_sockaddr.h"
 
 #include "loop_internal.h"
 #include "loop.h"
@@ -32,15 +33,20 @@ void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl)
 	loop_tcp_listen_acceptable(tl);
 }
 
-loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, struct sockaddr *addr,
+loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 		loop_stream_ops_t *accepted_ops)
 {
+	struct sockaddr sa;
+	if (!wuy_sockaddr_pton(addr, &sa, 0)) {
+		return NULL;
+	}
+
 	loop_tcp_listen_t *tl = malloc(sizeof(loop_tcp_listen_t));
 	if (tl == NULL) {
 		return NULL;
 	}
 
-	tl->fd = wuy_tcp_listen(addr, accepted_ops->tmo_read / 1000);
+	tl->fd = wuy_tcp_listen(&sa, accepted_ops->tmo_read / 1000);
 	if (tl->fd < 0) {
 		free(tl);
 		return NULL;
@@ -65,8 +71,16 @@ loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, struct sockaddr *addr,
 	return tl;
 }
 
-loop_stream_t *loop_stream_tcp_connect(loop_t *loop, struct sockaddr *addr,
-		loop_stream_ops_t *ops)
+loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
+		unsigned short default_port, loop_stream_ops_t *ops)
 {
-	return NULL;
+	struct sockaddr sa;
+	if (!wuy_sockaddr_pton(addr, &sa, default_port)) {
+		return NULL;
+	}
+	int fd = wuy_tcp_connect(&sa);
+	if (fd < 0) {
+		return NULL;
+	}
+	return loop_stream_add(loop, fd, ops);
 }

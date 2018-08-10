@@ -2,6 +2,7 @@
 #define LOOP_H
 
 #include <stddef.h>
+#include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -38,11 +39,13 @@ void loop_stream_close(loop_stream_t *);
 void loop_stream_idle(loop_stream_t *, int timeout);
 int loop_stream_fd(loop_stream_t *s);
 
-/* loop.tcp_listen */
-#include <sys/socket.h>
+/* loop.tcp */
 typedef struct loop_tcp_listen_s loop_tcp_listen_t;
-loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, struct sockaddr *addr,
+loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 		loop_stream_ops_t *accepted_ops);
+
+loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
+		unsigned short default_port, loop_stream_ops_t *ops);
 
 /* loop.inotify */
 #include <sys/inotify.h>
@@ -50,6 +53,7 @@ typedef struct loop_inotify_s loop_inotify_t;
 typedef struct {
 	void (*on_notify)(loop_inotify_t *, const struct inotify_event *);
 	void (*on_inside)(loop_inotify_t *, uint32_t mask, uint32_t cookie);
+	void (*on_delete)(loop_inotify_t *);
 	uint32_t	mask;
 } loop_inotify_ops_t;
 
