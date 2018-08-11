@@ -126,56 +126,58 @@ static void loop_stream_clear_defer(void *data)
 static void loop_stream_readable(loop_stream_t *s)
 {
 	uint8_t buffer[s->ops->bufsz_read];
+	ssize_t read_len;
+	size_t prev_len = 0;
 
-	/* read data into buffer */
+	/* previous read data */
 	if (s->read_buffer != NULL) {
 		memcpy(buffer, s->read_buffer, s->read_buf_len);
+		prev_len = s->read_buf_len;
 	}
 
-	ssize_t read_len = read(s->fd, buffer + s->read_buf_len,
-			s->ops->bufsz_read - s->read_buf_len);
-	if (read_len < 0) {
-		if (errno == EAGAIN) {
-			loop_stream_set_event_read(s);
-			loop_stream_set_timer_read(s);
+	do {
+		read_len = read(s->fd, buffer + prev_len, sizeof(buffer) - prev_len);
+		if (read_len < 0) {
+			if (errno == EAGAIN) {
+				break;
+			}
+			loop_stream_close_for(s, "read error", errno);
 			return;
 		}
-		loop_stream_close_for(s, "read error", errno);
-		return;
-	}
-	if (read_len == 0) {
-		loop_stream_close_for(s, "peer close", 0);
-		return;
-	}
+		if (read_len == 0) {
+			loop_stream_close_for(s, "peer close", 0);
+			return;
+		}
 
-	/* process data in buffer */
-	read_len += s->read_buf_len;
-	ssize_t proc_len = s->ops->on_read(s, buffer, read_len);
-	if (proc_len < 0) {
-		loop_stream_close_for(s, "app read error", 0);
-		return;
-	}
-	if (proc_len == 0) {
-		if (read_len == s->ops->bufsz_read) {
+		/* process data in buffer */
+		read_len += prev_len;
+		ssize_t proc_len = s->ops->on_read(s, buffer, read_len);
+		if (proc_len < 0) {
+			loop_stream_close_for(s, "app read error", 0);
+			return;
+		}
+
+		prev_len = read_len - proc_len;
+		if (prev_len == sizeof(buffer)) {
 			loop_stream_close_for(s, "read buffer full", 0);
 			return;
 		}
-	} else if (proc_len < read_len) {
-		s->read_buf_len = read_len - proc_len;
-		s->read_buffer = realloc(s->read_buffer, s->read_buf_len);
-		memcpy(s->read_buffer, buffer + proc_len, s->read_buf_len);
 
-	} else if (proc_len == read_len) {
+	} while(read_len < sizeof(buffer));
+
+	if (prev_len != 0) {
+		s->read_buf_len = prev_len;
+		s->read_buffer = realloc(s->read_buffer, prev_len);
+		memcpy(s->read_buffer, buffer, prev_len);
+
+	} else if (s->read_buffer != NULL) {
 		free(s->read_buffer);
 		s->read_buffer = NULL;
 		s->read_buf_len = 0;
-
-	} else {
-		abort();
 	}
 
-	/* tail recursive for read loop */
-	loop_stream_readable(s);
+	loop_stream_set_event_read(s);
+	loop_stream_set_timer_read(s);
 }
 
 void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)

@@ -11,6 +11,6 @@ int main()
 {
 	loop_stream_ops_t ops = { .on_read = on_read };
 	loop_t *loop = loop_new();
-	loop_tcp_listen(loop, "1234", &ops);
+	loop_tcp_listen(loop, "1234", NULL, &ops);
 	return loop_run(loop);
 }

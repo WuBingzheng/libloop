@@ -40,9 +40,17 @@ void loop_stream_idle(loop_stream_t *, int timeout);
 int loop_stream_fd(loop_stream_t *s);
 
 /* loop.tcp */
+#include <sys/socket.h>
 typedef struct loop_tcp_listen_s loop_tcp_listen_t;
+typedef struct {
+	bool	(*on_accept)(loop_tcp_listen_t *, loop_stream_t *,
+			struct sockaddr *addr);
+	int	tmo_defer;
+	int	backlog;
+} loop_tcp_listen_ops_t;
+
 loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
-		loop_stream_ops_t *accepted_ops);
+		loop_tcp_listen_ops_t *ops, loop_stream_ops_t *accepted_ops);
 
 loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
 		unsigned short default_port, loop_stream_ops_t *ops);
