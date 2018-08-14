@@ -173,17 +173,6 @@ static void loop_inotify_clear_defer(void *data)
 	}
 }
 
-static uint32_t loop_inotify_dict_wd_hash(const void *item)
-{
-	const loop_inotify_t *in = item;
-	return (uint32_t)(in->wd);
-}
-static bool loop_inotify_dict_wd_equal(const void *a, const void *b)
-{
-	const loop_inotify_t *ina = a;
-	const loop_inotify_t *inb = b;
-	return ina->wd == inb->wd;
-}
 static uint32_t loop_inotify_dict_inside_hash(const void *item)
 {
 	const loop_inotify_t *in = item;
@@ -210,11 +199,11 @@ void loop_inotify_init(loop_t *loop)
 	bzero(&event_status, sizeof(wuy_event_status_t));
 	wuy_event_add_read(loop->event_ctx, loop->inotify_fd, data, &event_status);
 
-	loop->wd_inotify = wuy_dict_new(loop_inotify_dict_wd_hash,
-			loop_inotify_dict_wd_equal,
+	loop->wd_inotify = wuy_dict_new_type(WUY_DICT_KEY_UINT32,
+			offsetof(loop_inotify_t, wd),
 			offsetof(loop_inotify_t, dict_node));
 
-	loop->inside_inotify = wuy_dict_new(loop_inotify_dict_inside_hash,
+	loop->inside_inotify = wuy_dict_new_func(loop_inotify_dict_inside_hash,
 			loop_inotify_dict_inside_equal,
 			offsetof(loop_inotify_t, dict_node));
 

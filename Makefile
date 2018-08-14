@@ -1,6 +1,6 @@
-CFLAGS = -I../libwuya -g
+CFLAGS = -I../libwuya -g -O2
 
-all: echo-server logsync-recv logsync-send
+all: libloop.a echo-server logsync-recv logsync-send
 
 logsync-recv: logsync-recv.o loop.o loop_stream.o loop_tcp.o loop_timer.o loop_inotify.o loop_idle.o ../libwuya/wuy_dict.o  ../libwuya/wuy_heap.o  ../libwuya/wuy_pool.o ../libwuya/wuy_event.o ../libwuya/wuy_sockaddr.o
 
@@ -21,6 +21,9 @@ loop_idle.o: loop_idle.c loop.h loop_internal.h
 loop_inotify.o: loop_inotify.c loop.h loop_internal.h
 
 echo-server.o: echo-server.c
+
+libloop.a: loop.o loop_stream.o loop_tcp.o loop_timer.o loop_inotify.o loop_idle.o
+	ar rcs $@ $^
 
 clean:
 	rm -f *.o echo-server
