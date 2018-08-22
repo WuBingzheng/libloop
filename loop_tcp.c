@@ -41,44 +41,59 @@ void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl)
 	}
 }
 
+static void loop_tcp_stream_ops_fixup(loop_stream_ops_t *ops)
+{
+	if (ops->tmo_read == 0) {
+		ops->tmo_read = 10 * 1000;
+	}
+	if (ops->tmo_write == 0) {
+		ops->tmo_write = 10 * 1000;
+	}
+}
+
 loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 		loop_tcp_listen_ops_t *ops, loop_stream_ops_t *accepted_ops)
 {
-	static loop_tcp_listen_ops_t default_zero_ops;
+	/* fix up ops */
+	static loop_tcp_listen_ops_t default_ops;
+	if (ops == NULL) {
+		ops = &default_ops;
+	}
+	if (ops->backlog == 0) {
+		ops->backlog = 1000;
+	}
 
+	loop_tcp_stream_ops_fixup(accepted_ops);
+
+	/* socket listen */
 	struct sockaddr sa;
 	if (!wuy_sockaddr_pton(addr, &sa, 0)) {
 		return NULL;
 	}
+	int fd = wuy_tcp_listen(&sa, ops->backlog, ops->reuse_port);
+	if (fd < 0) {
+		return NULL;
+	}
 
+	int defer = ops->tmo_defer ? ops->tmo_defer : accepted_ops->tmo_read;
+	wuy_tcp_set_defer_accept(fd, defer);
+
+	/* add event */
 	loop_tcp_listen_t *tl = malloc(sizeof(loop_tcp_listen_t));
 	if (tl == NULL) {
+		close(fd);
 		return NULL;
 	}
 
-	int defer = (ops && ops->tmo_defer) ? ops->tmo_defer : accepted_ops->tmo_read;
-	tl->fd = wuy_tcp_listen(&sa, defer / 1000);
-	if (tl->fd < 0) {
-		free(tl);
-		return NULL;
-	}
-
+	tl->fd = fd;
 	tl->type = LOOP_TYPE_TCP_LISTEN;
-	tl->ops = ops ? ops : &default_zero_ops;
+	tl->ops = ops;
 	tl->accepted_ops = accepted_ops;
 	tl->loop = loop;
 
 	wuy_event_status_t event_status;
 	bzero(&event_status, sizeof(wuy_event_status_t));
 	wuy_event_add_read(loop->event_ctx, tl->fd, tl, &event_status);
-
-	/* fix up accepted_ops */
-	if (accepted_ops->tmo_read == 0) {
-		accepted_ops->tmo_read = 10 * 1000;
-	}
-	if (accepted_ops->tmo_write == 0) {
-		accepted_ops->tmo_write = 10 * 1000;
-	}
 
 	return tl;
 }
@@ -95,12 +110,6 @@ loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
 		return NULL;
 	}
 
-	/* fix up ops */
-	if (ops->tmo_read == 0) {
-		ops->tmo_read = 10 * 1000;
-	}
-	if (ops->tmo_write == 0) {
-		ops->tmo_write = 10 * 1000;
-	}
+	loop_tcp_stream_ops_fixup(ops);
 	return loop_stream_add(loop, fd, ops);
 }

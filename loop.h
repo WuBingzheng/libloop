@@ -47,6 +47,7 @@ typedef struct {
 			struct sockaddr *addr);
 	int	tmo_defer;
 	int	backlog;
+	bool	reuse_port;
 } loop_tcp_listen_ops_t;
 
 loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
