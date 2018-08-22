@@ -56,12 +56,7 @@ loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 		return NULL;
 	}
 
-	if (ops == NULL) {
-		ops = &default_zero_ops;
-	}
-
-	int defer = ops->tmo_defer ? ops->tmo_defer : accepted_ops->tmo_read;
-
+	int defer = (ops && ops->tmo_defer) ? ops->tmo_defer : accepted_ops->tmo_read;
 	tl->fd = wuy_tcp_listen(&sa, defer / 1000);
 	if (tl->fd < 0) {
 		free(tl);
@@ -69,7 +64,7 @@ loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 	}
 
 	tl->type = LOOP_TYPE_TCP_LISTEN;
-	tl->ops = ops;
+	tl->ops = ops ? ops : &default_zero_ops;
 	tl->accepted_ops = accepted_ops;
 	tl->loop = loop;
 

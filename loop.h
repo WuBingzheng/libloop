@@ -11,7 +11,7 @@
 typedef struct loop_s loop_t;
 
 loop_t *loop_new(void);
-int loop_run(loop_t *loop);
+void loop_run(loop_t *loop);
 int loop_kill(loop_t *loop);
 
 /* loop.idle */

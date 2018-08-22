@@ -48,7 +48,7 @@ loop_t *loop_new(void)
 	return loop;
 }
 
-int loop_run(loop_t *loop)
+void loop_run(loop_t *loop)
 {
 	int64_t timeout = -1;
 	while (!loop->quit) {
@@ -61,7 +61,6 @@ int loop_run(loop_t *loop)
 		/* expire and get the latest timeout */
 		timeout = loop_timer_expire(loop->timer_ctx);
 	}
-	return 0;
 }
 
 int loop_kill(loop_t *loop)
