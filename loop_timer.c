@@ -72,6 +72,10 @@ int64_t loop_timer_expire(loop_timer_ctx_t *ctx)
 			return timer->expire - now;
 		}
 		wuy_heap_delete(ctx, timer);
-		timer->handler(timer->expire, timer->data);
+		int64_t next = timer->handler(timer->expire, timer->data);
+		if (next > 0) {
+			timer->expire += next;
+			wuy_heap_push(ctx, timer);
+		}
 	}
 }

@@ -71,7 +71,7 @@ loop_inotify_t *loop_inotify_add(loop_t *loop, const char *pathname,
 void loop_inotify_delete(loop_inotify_t *in);
 
 /* loop.timer */
-typedef void loop_timer_f(int64_t at, void *data);
+typedef int64_t loop_timer_f(int64_t at, void *data);
 typedef struct loop_timer_s loop_timer_t;
 
 loop_timer_t *loop_timer_new(loop_t *loop, loop_timer_f *handler, void *data);
