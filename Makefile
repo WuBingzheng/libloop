@@ -1,4 +1,4 @@
-CFLAGS = -I../libwuya -g -O2
+CFLAGS = -I../libwuya -g -Wall -O2
 
 all: libloop.a
 

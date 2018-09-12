@@ -63,7 +63,7 @@ void loop_run(loop_t *loop)
 	}
 }
 
-int loop_kill(loop_t *loop)
+void loop_kill(loop_t *loop)
 {
 	loop->quit = 1;
 }

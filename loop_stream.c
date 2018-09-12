@@ -40,15 +40,17 @@ struct loop_stream_s {
 static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errnum);
 
 /* timer utils */
-static void loop_stream_read_timeout(int64_t at, void *data)
+static int64_t loop_stream_read_timeout(int64_t at, void *data)
 {
 	loop_stream_t *s = data;
 	loop_stream_close_for(s, "read timedout", 0);
+	return 0;
 }
-static void loop_stream_write_timeout(int64_t at, void *data)
+static int64_t loop_stream_write_timeout(int64_t at, void *data)
 {
 	loop_stream_t *s = data;
 	loop_stream_close_for(s, "write timedout", 0);
+	return 0;
 }
 static void loop_stream_set_timer_read(loop_stream_t *s)
 {
