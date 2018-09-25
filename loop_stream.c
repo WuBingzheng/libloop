@@ -99,8 +99,6 @@ static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errn
 	}
 	s->closed = true;
 
-	printf("tcploop connection close: %s %s\n", reason, errnum?strerror(errnum):"");
-
 	if (s->ops->on_close != NULL) {
 		s->ops->on_close(s->app_data, reason, errnum);
 	}
