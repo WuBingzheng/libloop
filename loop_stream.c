@@ -261,9 +261,8 @@ loop_stream_t *loop_stream_add(loop_t *loop, int fd, loop_stream_ops_t *ops)
 		ops->bufsz_read = 1024 * 16;
 	}
 
-	/* read it to add event and timer */
-	loop_stream_readable(s);
-
+	loop_stream_set_event_read(s);
+	loop_stream_set_timer_read(s);
 	return s;
 }
 
@@ -284,4 +283,13 @@ void loop_stream_init(loop_t *loop)
 int loop_stream_fd(loop_stream_t *s)
 {
 	return s->fd;
+}
+
+void loop_stream_set_app_data(loop_stream_t *s, void *app_data)
+{
+	s->app_data = app_data;
+}
+void *loop_stream_get_app_data(loop_stream_t *s)
+{
+	return s->app_data;
 }

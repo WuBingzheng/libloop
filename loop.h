@@ -38,6 +38,8 @@ ssize_t loop_stream_sendfile(loop_stream_t *, int in_fd, off_t *offset, size_t l
 void loop_stream_close(loop_stream_t *);
 void loop_stream_idle(loop_stream_t *, int timeout);
 int loop_stream_fd(loop_stream_t *s);
+void loop_stream_set_app_data(loop_stream_t *s, void *app_data);
+void *loop_stream_get_app_data(loop_stream_t *s);
 
 /* loop.tcp */
 #include <sys/socket.h>
@@ -52,6 +54,8 @@ typedef struct {
 
 loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 		loop_tcp_listen_ops_t *ops, loop_stream_ops_t *accepted_ops);
+void loop_tcp_listen_set_app_data(loop_tcp_listen_t *tl, void *app_data);
+void *loop_tcp_listen_get_app_data(loop_tcp_listen_t *tl);
 
 loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
 		unsigned short default_port, loop_stream_ops_t *ops);

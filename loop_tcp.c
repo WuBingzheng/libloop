@@ -37,7 +37,11 @@ void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl)
 			if (!tl->ops->on_accept(tl, s, &client_addr)) {
 				loop_stream_close(s);
 			}
+		} else {
+			loop_stream_set_app_data(s, tl);
 		}
+
+		loop_stream_event_handler(s, true, false);
 	}
 }
 
@@ -96,6 +100,15 @@ loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 	wuy_event_add_read(loop->event_ctx, tl->fd, tl, &event_status);
 
 	return tl;
+}
+
+void loop_tcp_listen_set_app_data(loop_tcp_listen_t *tl, void *app_data)
+{
+	tl->app_data = app_data;
+}
+void *loop_tcp_listen_get_app_data(loop_tcp_listen_t *tl)
+{
+	return tl->app_data;
 }
 
 loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
