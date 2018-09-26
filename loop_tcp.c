@@ -30,7 +30,7 @@ void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl)
 			return;
 		}
 
-		loop_stream_t *s = loop_stream_add(tl->loop,
+		loop_stream_t *s = loop_stream_new(tl->loop,
 				client_fd, tl->accepted_ops);
 
 		if (tl->ops->on_accept) {

@@ -243,7 +243,7 @@ ssize_t loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, size_t 
 	return loop_stream_write_handle(s, len, write_len);
 }
 
-loop_stream_t *loop_stream_add(loop_t *loop, int fd, loop_stream_ops_t *ops)
+loop_stream_t *loop_stream_new(loop_t *loop, int fd, loop_stream_ops_t *ops)
 {
 	loop_stream_t *s = wuy_pool_alloc(loop->stream_pool);
 	if (s == NULL) {
@@ -261,8 +261,18 @@ loop_stream_t *loop_stream_add(loop_t *loop, int fd, loop_stream_ops_t *ops)
 		ops->bufsz_read = 1024 * 16;
 	}
 
-	loop_stream_set_event_read(s);
-	loop_stream_set_timer_read(s);
+	return s;
+}
+
+loop_stream_t *loop_stream_add(loop_t *loop, int fd, loop_stream_ops_t *ops)
+{
+	loop_stream_t *s = loop_stream_new(loop, fd, ops);
+	if (s == NULL) {
+		return NULL;
+	}
+
+	/* read to add event and timer */
+	loop_stream_readable(s);
 	return s;
 }
 
