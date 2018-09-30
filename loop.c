@@ -50,16 +50,15 @@ loop_t *loop_new(void)
 
 void loop_run(loop_t *loop)
 {
-	int64_t timeout = -1;
 	while (!loop->quit) {
+		/* expire and get the latest timeout */
+		int64_t timeout = loop_timer_expire(loop->timer_ctx);
+
 		/* call loop_event_handler() to handle events */
 		wuy_event_run(loop->event_ctx, timeout);
 
 		/* idle functions */
 		loop_idle_run(loop);
-
-		/* expire and get the latest timeout */
-		timeout = loop_timer_expire(loop->timer_ctx);
 	}
 }
 
