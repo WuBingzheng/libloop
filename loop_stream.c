@@ -90,6 +90,10 @@ static void loop_stream_del_event_write(loop_stream_t *s)
 {
 	wuy_event_del_write(s->loop->event_ctx, s->fd, s, &s->event_status);
 }
+static void loop_stream_del_event(loop_stream_t *s)
+{
+	wuy_event_del(s->loop->event_ctx, s->fd, &s->event_status);
+}
 
 
 static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errnum)
@@ -103,6 +107,7 @@ static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errn
 		s->ops->on_close(s->app_data, reason, errnum);
 	}
 
+	loop_stream_del_event(s);
 	close(s->fd);
 
 	free(s->read_buffer);
