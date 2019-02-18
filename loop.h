@@ -79,8 +79,8 @@ typedef int64_t loop_timer_f(int64_t at, void *data);
 typedef struct loop_timer_s loop_timer_t;
 
 loop_timer_t *loop_timer_new(loop_t *loop, loop_timer_f *handler, void *data);
-bool loop_timer_set_at(loop_t *loop, loop_timer_t *timer, int64_t at);
-bool loop_timer_set_after(loop_t *loop, loop_timer_t *timer, int64_t after);
-void loop_timer_delete(loop_t *loop, loop_timer_t *timer);
+bool loop_timer_set_at(loop_timer_t *timer, int64_t at);
+bool loop_timer_set_after(loop_timer_t *timer, int64_t after);
+void loop_timer_delete(loop_timer_t *timer);
 
 #endif

@@ -10,6 +10,7 @@ struct loop_timer_s {
 	int64_t			expire; /* in millisecond */
 	wuy_heap_node_t		heap_node;
 	loop_timer_f		*handler;
+	loop_timer_ctx_t	*ctx;
 	void			*data;
 };
 
@@ -36,27 +37,28 @@ loop_timer_t *loop_timer_new(loop_t *loop, loop_timer_f *handler, void *data)
 		return NULL;
 	}
 	timer->handler = handler;
+	timer->ctx = loop->timer_ctx;
 	timer->data = data;
 	return timer;
 }
 
-bool loop_timer_set_at(loop_t *loop, loop_timer_t *timer, int64_t at)
+bool loop_timer_set_at(loop_timer_t *timer, int64_t at)
 {
 	timer->expire = at;
-	return wuy_heap_push_or_fix(loop->timer_ctx, timer);
+	return wuy_heap_push_or_fix(timer->ctx, timer);
 }
 
-bool loop_timer_set_after(loop_t *loop, loop_timer_t *timer, int64_t after)
+bool loop_timer_set_after(loop_timer_t *timer, int64_t after)
 {
-	return loop_timer_set_at(loop, timer, after + loop_timer_now());
+	return loop_timer_set_at(timer, after + loop_timer_now());
 }
 
-void loop_timer_delete(loop_t *loop, loop_timer_t *timer)
+void loop_timer_delete(loop_timer_t *timer)
 {
 	if (timer == NULL) {
 		return;
 	}
-	wuy_heap_delete(loop->timer_ctx, timer);
+	wuy_heap_delete(timer->ctx, timer);
 	wuy_pool_free(timer);
 }
 
@@ -76,6 +78,8 @@ int64_t loop_timer_expire(loop_timer_ctx_t *ctx)
 		if (next > 0) {
 			timer->expire += next;
 			wuy_heap_push(ctx, timer);
+		} else if (next < 0) {
+			loop_timer_delete(timer);
 		}
 	}
 }

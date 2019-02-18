@@ -57,23 +57,23 @@ static void loop_stream_set_timer_read(loop_stream_t *s)
 	if (s->timer_read == NULL) {
 		s->timer_read = loop_timer_new(s->loop, loop_stream_read_timeout, s);
 	}
-	loop_timer_set_after(s->loop, s->timer_read, s->ops->tmo_read);
+	loop_timer_set_after(s->timer_read, s->ops->tmo_read);
 }
 static void loop_stream_set_timer_write(loop_stream_t *s)
 {
 	if (s->timer_write == NULL) {
 		s->timer_write = loop_timer_new(s->loop, loop_stream_write_timeout, s);
 	}
-	loop_timer_set_after(s->loop, s->timer_write, s->ops->tmo_write);
+	loop_timer_set_after(s->timer_write, s->ops->tmo_write);
 }
 static void loop_stream_del_timer_read(loop_stream_t *s)
 {
-	loop_timer_delete(s->loop, s->timer_read);
+	loop_timer_delete(s->timer_read);
 	s->timer_read = NULL;
 }
 static void loop_stream_del_timer_write(loop_stream_t *s)
 {
-	loop_timer_delete(s->loop, s->timer_write);
+	loop_timer_delete(s->timer_write);
 	s->timer_write = NULL;
 }
 
@@ -104,7 +104,7 @@ static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errn
 	s->closed = true;
 
 	if (s->ops->on_close != NULL) {
-		s->ops->on_close(s->app_data, reason, errnum);
+		s->ops->on_close(s, reason, errnum);
 	}
 
 	loop_stream_del_event(s);
