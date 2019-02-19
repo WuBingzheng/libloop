@@ -161,11 +161,19 @@ static void loop_stream_readable(loop_stream_t *s)
 			loop_stream_close_for(s, "app read error", 0);
 			return;
 		}
+		if (proc_len > read_len) {
+			loop_stream_close_for(s, "app read invalid return", 0);
+			return;
+		}
 
 		prev_len = read_len - proc_len;
 		if (prev_len == sizeof(buffer)) {
 			loop_stream_close_for(s, "read buffer full", 0);
 			return;
+		}
+
+		if (prev_len != 0) {
+			memmove(buffer, buffer + proc_len, prev_len);
 		}
 
 	} while(read_len < sizeof(buffer));
