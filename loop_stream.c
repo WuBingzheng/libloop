@@ -172,7 +172,7 @@ static void loop_stream_readable(loop_stream_t *s)
 			return;
 		}
 
-		if (prev_len != 0) {
+		if (prev_len != 0 && proc_len != 0) {
 			memmove(buffer, buffer + proc_len, prev_len);
 		}
 
