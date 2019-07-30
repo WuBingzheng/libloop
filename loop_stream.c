@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/sendfile.h>
+#include <openssl/ssl.h>
 
 #include "wuy_event.h"
 #include "wuy_pool.h"
@@ -17,6 +18,7 @@ struct loop_stream_s {
 	int			type; /* keep this top! */
 
 	int			fd;
+	SSL			*ssl;
 
 	bool			closed;
 	bool			write_blocked;
@@ -107,6 +109,9 @@ static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errn
 		s->ops->on_close(s, reason, errnum);
 	}
 
+	if (s->ssl != NULL) {
+		SSL_free(s->ssl);
+	}
 	loop_stream_del_event(s);
 	close(s->fd);
 
@@ -141,17 +146,33 @@ static void loop_stream_readable(loop_stream_t *s)
 	}
 
 	do {
-		read_len = read(s->fd, buffer + prev_len, sizeof(buffer) - prev_len);
-		if (read_len < 0) {
-			if (errno == EAGAIN) {
-				break;
+		if (s->ssl != NULL) {
+			read_len = SSL_read(s->ssl, buffer + prev_len, sizeof(buffer) - prev_len);
+			if (read_len <= 0) {
+				int sslerr = SSL_get_error(s->ssl, read_len);
+				if (sslerr == SSL_ERROR_WANT_READ || sslerr == SSL_ERROR_WANT_WRITE) {
+					break;
+				}
+				if (sslerr == SSL_ERROR_ZERO_RETURN) {
+					loop_stream_close_for(s, "peer close", 0);
+					return;
+				}
+				loop_stream_close_for(s, "SSL read error", sslerr);
+				return;
 			}
-			loop_stream_close_for(s, "read error", errno);
-			return;
-		}
-		if (read_len == 0) {
-			loop_stream_close_for(s, "peer close", 0);
-			return;
+		} else {
+			read_len = read(s->fd, buffer + prev_len, sizeof(buffer) - prev_len);
+			if (read_len < 0) {
+				if (errno == EAGAIN) {
+					break;
+				}
+				loop_stream_close_for(s, "read error", errno);
+				return;
+			}
+			if (read_len == 0) {
+				loop_stream_close_for(s, "peer close", 0);
+				return;
+			}
 		}
 
 		/* process data in buffer */
@@ -209,10 +230,6 @@ void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 
 static ssize_t loop_stream_write_handle(loop_stream_t *s, size_t data_len, ssize_t write_len)
 {
-	if (write_len < 0 && errno != EAGAIN) {
-		loop_stream_close_for(s, "write error", errno);
-		return write_len;
-	}
 	if (write_len == data_len) {
 		loop_stream_del_event_write(s);
 		loop_stream_del_timer_write(s);
@@ -240,7 +257,24 @@ ssize_t loop_stream_write(loop_stream_t *s, const void *data, size_t len)
 	if (s->write_blocked) {
 		return 0;
 	}
-	ssize_t write_len = write(s->fd, data, len);
+
+	ssize_t write_len;
+	if (s->ssl != NULL) {
+		write_len = SSL_write(s->ssl, data, len);
+		if (write_len <= 0) {
+			int sslerr = SSL_get_error(s->ssl, write_len);
+			if (sslerr != SSL_ERROR_WANT_READ && sslerr != SSL_ERROR_WANT_WRITE) {
+				loop_stream_close_for(s, "SSL write error", sslerr);
+				return -1;
+			}
+		}
+	} else {
+		write_len = write(s->fd, data, len);
+		if (write_len < 0 && errno != EAGAIN) {
+			loop_stream_close_for(s, "write error", errno);
+			return write_len;
+		}
+	}
 	return loop_stream_write_handle(s, len, write_len);
 }
 
@@ -252,7 +286,13 @@ ssize_t loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, size_t 
 	if (s->write_blocked) {
 		return 0;
 	}
+	assert(s->ssl == NULL);
+
 	ssize_t write_len = sendfile(s->fd, in_fd, offset, len);
+	if (write_len < 0 && errno != EAGAIN) {
+		loop_stream_close_for(s, "sendfile error", errno);
+		return write_len;
+	}
 	return loop_stream_write_handle(s, len, write_len);
 }
 
@@ -269,23 +309,17 @@ loop_stream_t *loop_stream_new(loop_t *loop, int fd, loop_stream_ops_t *ops)
 	s->loop = loop;
 	s->ops = ops;
 
+	if (ops->ssl_ctx != NULL) {
+		/* SSL_set_accept_state() or SSL_set_connect_state() is need */
+		s->ssl = SSL_new(ops->ssl_ctx);
+		SSL_set_fd(s->ssl, fd);
+	}
+
 	/* fix up ops */
 	if (ops->bufsz_read == 0) {
 		ops->bufsz_read = 1024 * 16;
 	}
 
-	return s;
-}
-
-loop_stream_t *loop_stream_add(loop_t *loop, int fd, loop_stream_ops_t *ops)
-{
-	loop_stream_t *s = loop_stream_new(loop, fd, ops);
-	if (s == NULL) {
-		return NULL;
-	}
-
-	/* read to add event and timer */
-	loop_stream_readable(s);
 	return s;
 }
 
@@ -315,4 +349,9 @@ void loop_stream_set_app_data(loop_stream_t *s, void *app_data)
 void *loop_stream_get_app_data(loop_stream_t *s)
 {
 	return s->app_data;
+}
+
+SSL *loop_stream_ssl(loop_stream_t *s)
+{
+	return s->ssl;
 }

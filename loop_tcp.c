@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <openssl/ssl.h>
 
 #include "wuy_tcp.h"
 #include "wuy_sockaddr.h"
@@ -36,9 +37,15 @@ void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl)
 		if (tl->ops->on_accept) {
 			if (!tl->ops->on_accept(tl, s, &client_addr)) {
 				loop_stream_close(s);
+				continue;
 			}
 		} else {
 			loop_stream_set_app_data(s, tl);
+		}
+
+		SSL *ssl = loop_stream_ssl(s);
+		if (ssl != NULL) {
+			SSL_set_accept_state(ssl);
 		}
 
 		loop_stream_event_handler(s, true, false);
@@ -124,5 +131,17 @@ loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
 	}
 
 	loop_tcp_stream_ops_fixup(ops);
-	return loop_stream_add(loop, fd, ops);
+
+	loop_stream_t *s = loop_stream_new(loop, fd, ops);
+	if (s == NULL) {
+		return NULL;
+	}
+
+	SSL *ssl = loop_stream_ssl(s);
+	if (ssl != NULL) {
+		SSL_set_connect_state(ssl);
+	}
+
+	loop_stream_event_handler(s, true, false);
+	return s;
 }

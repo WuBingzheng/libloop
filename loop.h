@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <openssl/ssl.h>
 
 
 /* == loop == */
@@ -82,12 +83,9 @@ typedef struct {
 
 	int	tmo_read;   ///< read timeout in millisecond. Use 10*1000 if not set.
 	int	tmo_write;  ///< write timeout in millisecond. Use 10*1000 if not set.
-} loop_stream_ops_t;
 
-/**
- * @brief Add a stream fd, which can be pipe or tcp connection.
- */
-loop_stream_t *loop_stream_add(loop_t *loop, int fd, loop_stream_ops_t *ops);
+	SSL_CTX	*ssl_ctx;
+} loop_stream_ops_t;
 
 /**
  * @brief Write data to stream.
@@ -118,6 +116,11 @@ void loop_stream_close(loop_stream_t *);
  * @brief Return stream's fd.
  */
 int loop_stream_fd(loop_stream_t *s);
+
+/**
+ * @brief Return stream's SSL.
+ */
+SSL *loop_stream_ssl(loop_stream_t *ssl);
 
 /**
  * @brief Set application data to stream.
