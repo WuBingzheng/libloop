@@ -15,7 +15,6 @@
 #define LOOP_H
 
 #include <stddef.h>
-#include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <openssl/ssl.h>
@@ -75,17 +74,20 @@ typedef struct loop_stream_s loop_stream_t;
  * field:on_read() is the only mandatory member you must set.
  */
 typedef struct {
-	ssize_t	(*on_read)(loop_stream_t *, void *data, size_t len); ///< read available handler
+	int	(*on_read)(loop_stream_t *, void *data, int len); ///< read available handler
 	void	(*on_close)(loop_stream_t *, const char *reason, int errnum); ///< close handler
 	void	(*on_writable)(loop_stream_t *); ///< write available handler, used with loop_stream_write()
 
 	int	bufsz_read; ///< read buffer size. Use 16K if not set.
 
-	int	tmo_read;   ///< read timeout in millisecond. Use 10*1000 if not set.
-	int	tmo_write;  ///< write timeout in millisecond. Use 10*1000 if not set.
-
-	SSL_CTX	*ssl_ctx;
+	int	tmo_read;   ///< read timeout in millisecond. Use 10*1000 if not set. No timeout if negative.
+	int	tmo_write;  ///< write timeout in millisecond. Use 10*1000 if not set. No timeout if negative.
 } loop_stream_ops_t;
+
+/**
+ * @brief Create a stream.
+ */
+loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *ops);
 
 /**
  * @brief Write data to stream.
@@ -98,14 +100,14 @@ typedef struct {
  * is set, this returns the writen data length (maybe 0), and the application
  * should save the un-writen data, and re-send it in ops.on_writable().
  */
-ssize_t loop_stream_write(loop_stream_t *, const void *data, size_t len);
+int loop_stream_write(loop_stream_t *, const void *data, int len);
 
 /**
  * @brief Write data to stream by sendfile().
  *
  * Return the same with loop_stream_write().
  */
-ssize_t loop_stream_sendfile(loop_stream_t *, int in_fd, off_t *offset, size_t len);
+int loop_stream_sendfile(loop_stream_t *, int in_fd, off_t *offset, int len);
 
 /**
  * @brief Close a stream.
@@ -120,7 +122,16 @@ int loop_stream_fd(loop_stream_t *s);
 /**
  * @brief Return stream's SSL.
  */
-SSL *loop_stream_ssl(loop_stream_t *ssl);
+SSL *loop_stream_get_ssl(loop_stream_t *ssl);
+
+/**
+ * @brief Set stream's SSL.
+ *
+ * Must called before running event.
+ * For example, set in .on_accept() for loop_tcp_listen();
+ * and in before_run() for loop_tcp_connect().
+ */
+void loop_stream_set_ssl(loop_stream_t *s, SSL *ssl);
 
 /**
  * @brief Set application data to stream.
@@ -161,7 +172,8 @@ typedef struct {
  * @param accepted_ops is applied for accepted connections.
  */
 loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
-		loop_tcp_listen_ops_t *ops, loop_stream_ops_t *accepted_ops);
+		const loop_tcp_listen_ops_t *ops,
+		const loop_stream_ops_t *accepted_ops);
 
 /**
  * @brief Set application data to listen context.
@@ -178,7 +190,7 @@ void *loop_tcp_listen_get_app_data(loop_tcp_listen_t *tl);
  * @param addr and default_port see libwuya/wuy_sockaddr.h:wuy_sockaddr_pton() for format.
  */
 loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
-		unsigned short default_port, loop_stream_ops_t *ops);
+		unsigned short default_port, const loop_stream_ops_t *ops);
 
 
 /* == loop.inotify == */

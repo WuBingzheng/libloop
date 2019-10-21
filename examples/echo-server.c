@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include "loop.h"
 
-ssize_t on_read(loop_stream_t *s, void *data, size_t len)
+int on_read(loop_stream_t *s, void *data, int len)
 {
-	printf("read: %ld\n", len);
+	printf("read: %d\n", len);
 	return loop_stream_write(s, data, len);
 }
 

@@ -22,7 +22,6 @@ void loop_idle_run(loop_t *loop);
 
 /* stream */
 void loop_stream_init(loop_t *loop);
-loop_stream_t *loop_stream_new(loop_t *loop, int fd, loop_stream_ops_t *ops);
 void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable);
 
 /* tcp_listen */

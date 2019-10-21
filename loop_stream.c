@@ -29,11 +29,11 @@ struct loop_stream_s {
 	loop_timer_t		*timer_write;
 
 	void			*read_buffer;
-	size_t			read_buf_len;
+	int			read_buf_len;
 
 	wuy_list_node_t		list_node;
 
-	loop_stream_ops_t	*ops;
+	const loop_stream_ops_t	*ops;
 
 	loop_t			*loop;
 	void			*app_data;
@@ -56,17 +56,23 @@ static int64_t loop_stream_write_timeout(int64_t at, void *data)
 }
 static void loop_stream_set_timer_read(loop_stream_t *s)
 {
+	if (s->ops->tmo_read < 0) {
+		return;
+	}
 	if (s->timer_read == NULL) {
 		s->timer_read = loop_timer_new(s->loop, loop_stream_read_timeout, s);
 	}
-	loop_timer_set_after(s->timer_read, s->ops->tmo_read);
+	loop_timer_set_after(s->timer_read, s->ops->tmo_read ? s->ops->tmo_read : 10*1000);
 }
 static void loop_stream_set_timer_write(loop_stream_t *s)
 {
+	if (s->ops->tmo_write < 0) {
+		return;
+	}
 	if (s->timer_write == NULL) {
 		s->timer_write = loop_timer_new(s->loop, loop_stream_write_timeout, s);
 	}
-	loop_timer_set_after(s->timer_write, s->ops->tmo_write);
+	loop_timer_set_after(s->timer_write, s->ops->tmo_write ? s->ops->tmo_write : 10*1000);
 }
 static void loop_stream_del_timer_read(loop_stream_t *s)
 {
@@ -135,9 +141,9 @@ static void loop_stream_clear_defer(void *data)
 
 static void loop_stream_readable(loop_stream_t *s)
 {
-	uint8_t buffer[s->ops->bufsz_read];
-	ssize_t read_len;
-	size_t prev_len = 0;
+	uint8_t buffer[s->ops->bufsz_read ? s->ops->bufsz_read : 1024*16];
+	int read_len;
+	int prev_len = 0;
 
 	/* previous read data */
 	if (s->read_buffer != NULL) {
@@ -177,7 +183,7 @@ static void loop_stream_readable(loop_stream_t *s)
 
 		/* process data in buffer */
 		read_len += prev_len;
-		ssize_t proc_len = s->ops->on_read(s, buffer, read_len);
+		int proc_len = s->ops->on_read(s, buffer, read_len);
 		if (proc_len < 0) {
 			loop_stream_close_for(s, "app read error", 0);
 			return;
@@ -228,7 +234,7 @@ void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 	}
 }
 
-static ssize_t loop_stream_write_handle(loop_stream_t *s, size_t data_len, ssize_t write_len)
+static int loop_stream_write_handle(loop_stream_t *s, int data_len, int write_len)
 {
 	if (write_len == data_len) {
 		loop_stream_del_event_write(s);
@@ -249,7 +255,7 @@ static ssize_t loop_stream_write_handle(loop_stream_t *s, size_t data_len, ssize
 	return write_len < 0 ? 0 : write_len;
 }
 
-ssize_t loop_stream_write(loop_stream_t *s, const void *data, size_t len)
+int loop_stream_write(loop_stream_t *s, const void *data, int len)
 {
 	if (s->closed) {
 		return -1;
@@ -258,7 +264,7 @@ ssize_t loop_stream_write(loop_stream_t *s, const void *data, size_t len)
 		return 0;
 	}
 
-	ssize_t write_len;
+	int write_len;
 	if (s->ssl != NULL) {
 		write_len = SSL_write(s->ssl, data, len);
 		if (write_len <= 0) {
@@ -278,7 +284,7 @@ ssize_t loop_stream_write(loop_stream_t *s, const void *data, size_t len)
 	return loop_stream_write_handle(s, len, write_len);
 }
 
-ssize_t loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, size_t len)
+int loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, int len)
 {
 	if (s->closed) {
 		return -1;
@@ -288,7 +294,7 @@ ssize_t loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, size_t 
 	}
 	assert(s->ssl == NULL);
 
-	ssize_t write_len = sendfile(s->fd, in_fd, offset, len);
+	int write_len = sendfile(s->fd, in_fd, offset, len);
 	if (write_len < 0 && errno != EAGAIN) {
 		loop_stream_close_for(s, "sendfile error", errno);
 		return write_len;
@@ -296,7 +302,7 @@ ssize_t loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, size_t 
 	return loop_stream_write_handle(s, len, write_len);
 }
 
-loop_stream_t *loop_stream_new(loop_t *loop, int fd, loop_stream_ops_t *ops)
+loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *ops)
 {
 	loop_stream_t *s = wuy_pool_alloc(loop->stream_pool);
 	if (s == NULL) {
@@ -309,16 +315,9 @@ loop_stream_t *loop_stream_new(loop_t *loop, int fd, loop_stream_ops_t *ops)
 	s->loop = loop;
 	s->ops = ops;
 
-	if (ops->ssl_ctx != NULL) {
-		/* SSL_set_accept_state() or SSL_set_connect_state() is need */
-		s->ssl = SSL_new(ops->ssl_ctx);
-		SSL_set_fd(s->ssl, fd);
-	}
-
-	/* fix up ops */
-	if (ops->bufsz_read == 0) {
-		ops->bufsz_read = 1024 * 16;
-	}
+	/* add read event */
+	loop_stream_set_event_read(s);
+	loop_stream_set_timer_read(s);
 
 	return s;
 }
@@ -351,7 +350,11 @@ void *loop_stream_get_app_data(loop_stream_t *s)
 	return s->app_data;
 }
 
-SSL *loop_stream_ssl(loop_stream_t *s)
+SSL *loop_stream_get_ssl(loop_stream_t *s)
 {
 	return s->ssl;
+}
+void loop_stream_set_ssl(loop_stream_t *s, SSL *ssl)
+{
+	s->ssl = ssl;
 }

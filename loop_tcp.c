@@ -1,7 +1,6 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <strings.h>
-#include <openssl/ssl.h>
 
 #include "wuy_tcp.h"
 #include "wuy_sockaddr.h"
@@ -13,8 +12,8 @@
 struct loop_tcp_listen_s {
 	int			type; /* keep this top! */
 	int			fd;
-	loop_tcp_listen_ops_t	*ops;
-	loop_stream_ops_t	*accepted_ops;
+	const loop_tcp_listen_ops_t	*ops;
+	const loop_stream_ops_t	*accepted_ops;
 	loop_t			*loop;
 	void			*app_data;
 };
@@ -42,46 +41,24 @@ void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl)
 		} else {
 			loop_stream_set_app_data(s, tl);
 		}
-
-		SSL *ssl = loop_stream_ssl(s);
-		if (ssl != NULL) {
-			SSL_set_accept_state(ssl);
-		}
-
-		loop_stream_event_handler(s, true, false);
-	}
-}
-
-static void loop_tcp_stream_ops_fixup(loop_stream_ops_t *ops)
-{
-	if (ops->tmo_read == 0) {
-		ops->tmo_read = 10 * 1000;
-	}
-	if (ops->tmo_write == 0) {
-		ops->tmo_write = 10 * 1000;
 	}
 }
 
 loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
-		loop_tcp_listen_ops_t *ops, loop_stream_ops_t *accepted_ops)
+		const loop_tcp_listen_ops_t *ops,
+		const loop_stream_ops_t *accepted_ops)
 {
-	/* fix up ops */
 	static loop_tcp_listen_ops_t default_ops;
 	if (ops == NULL) {
 		ops = &default_ops;
 	}
-	if (ops->backlog == 0) {
-		ops->backlog = 1000;
-	}
-
-	loop_tcp_stream_ops_fixup(accepted_ops);
 
 	/* socket listen */
 	struct sockaddr sa;
 	if (!wuy_sockaddr_pton(addr, &sa, 0)) {
 		return NULL;
 	}
-	int fd = wuy_tcp_listen(&sa, ops->backlog, ops->reuse_port);
+	int fd = wuy_tcp_listen(&sa, ops->backlog ? ops->backlog : 1000, ops->reuse_port);
 	if (fd < 0) {
 		return NULL;
 	}
@@ -119,7 +96,7 @@ void *loop_tcp_listen_get_app_data(loop_tcp_listen_t *tl)
 }
 
 loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
-		unsigned short default_port, loop_stream_ops_t *ops)
+		unsigned short default_port, const loop_stream_ops_t *ops)
 {
 	struct sockaddr sa;
 	if (!wuy_sockaddr_pton(addr, &sa, default_port)) {
@@ -130,18 +107,10 @@ loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
 		return NULL;
 	}
 
-	loop_tcp_stream_ops_fixup(ops);
-
 	loop_stream_t *s = loop_stream_new(loop, fd, ops);
 	if (s == NULL) {
 		return NULL;
 	}
 
-	SSL *ssl = loop_stream_ssl(s);
-	if (ssl != NULL) {
-		SSL_set_connect_state(ssl);
-	}
-
-	loop_stream_event_handler(s, true, false);
 	return s;
 }

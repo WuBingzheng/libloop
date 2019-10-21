@@ -1,2 +1,5 @@
 *.o
 libloop.a
+examples/echo-server
+examples/echo-server-ssl
+examples/ssl-client
