@@ -139,46 +139,62 @@ static void loop_stream_clear_defer(void *data)
 	}
 }
 
+int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len)
+{
+	if (s->ssl != NULL) {
+		int read_len = SSL_read(s->ssl, buffer, buf_len);
+		if (read_len <= 0) {
+			int sslerr = SSL_get_error(s->ssl, read_len);
+			if (sslerr == SSL_ERROR_WANT_READ || sslerr == SSL_ERROR_WANT_WRITE) {
+				return 0;
+			}
+			if (sslerr == SSL_ERROR_ZERO_RETURN) {
+				loop_stream_close_for(s, "peer close", 0);
+				return -1;
+			}
+			loop_stream_close_for(s, "SSL read error", sslerr);
+			return -2;
+		}
+		return read_len;
+	} else {
+		int read_len = read(s->fd, buffer, buf_len);
+		if (read_len < 0) {
+			if (errno == EAGAIN) {
+				return 0;
+			}
+			loop_stream_close_for(s, "read error", errno);
+			return -1;
+		}
+		if (read_len == 0) {
+			loop_stream_close_for(s, "peer close", 0);
+			return -2;
+		}
+		return read_len;
+	}
+}
+
 static void loop_stream_readable(loop_stream_t *s)
 {
-	uint8_t buffer[s->ops->bufsz_read ? s->ops->bufsz_read : 1024*16];
-	int read_len;
-	int prev_len = 0;
+	loop_stream_set_event_read(s);
+	loop_stream_set_timer_read(s);
 
-	/* previous read data */
-	if (s->read_buffer != NULL) {
-		memcpy(buffer, s->read_buffer, s->read_buf_len);
-		prev_len = s->read_buf_len;
+	if (s->ops->on_readable != NULL) {
+		s->ops->on_readable(s);
+		return;
 	}
 
-	do {
-		if (s->ssl != NULL) {
-			read_len = SSL_read(s->ssl, buffer + prev_len, sizeof(buffer) - prev_len);
-			if (read_len <= 0) {
-				int sslerr = SSL_get_error(s->ssl, read_len);
-				if (sslerr == SSL_ERROR_WANT_READ || sslerr == SSL_ERROR_WANT_WRITE) {
-					break;
-				}
-				if (sslerr == SSL_ERROR_ZERO_RETURN) {
-					loop_stream_close_for(s, "peer close", 0);
-					return;
-				}
-				loop_stream_close_for(s, "SSL read error", sslerr);
-				return;
-			}
-		} else {
-			read_len = read(s->fd, buffer + prev_len, sizeof(buffer) - prev_len);
-			if (read_len < 0) {
-				if (errno == EAGAIN) {
-					break;
-				}
-				loop_stream_close_for(s, "read error", errno);
-				return;
-			}
-			if (read_len == 0) {
-				loop_stream_close_for(s, "peer close", 0);
-				return;
-			}
+	uint8_t buffer[s->ops->bufsz_read ? s->ops->bufsz_read : 1024*16];
+	int prev_len = s->read_buf_len;
+	uint8_t *prev_buf = s->read_buffer;
+
+	while (1) {
+		if (prev_len > 0) {
+			memmove(buffer, prev_buf, prev_len);
+		}
+
+		int read_len = loop_stream_read(s, buffer + prev_len, sizeof(buffer) - prev_len);
+		if (read_len <= 0) {
+			break;
 		}
 
 		/* process data in buffer */
@@ -193,17 +209,13 @@ static void loop_stream_readable(loop_stream_t *s)
 			return;
 		}
 
+		prev_buf = buffer + proc_len;
 		prev_len = read_len - proc_len;
 		if (prev_len == sizeof(buffer)) {
 			loop_stream_close_for(s, "read buffer full", 0);
 			return;
 		}
-
-		if (prev_len != 0 && proc_len != 0) {
-			memmove(buffer, buffer + proc_len, prev_len);
-		}
-
-	} while(read_len < sizeof(buffer));
+	}
 
 	if (prev_len != 0) {
 		s->read_buf_len = prev_len;
@@ -215,9 +227,6 @@ static void loop_stream_readable(loop_stream_t *s)
 		s->read_buffer = NULL;
 		s->read_buf_len = 0;
 	}
-
-	loop_stream_set_event_read(s);
-	loop_stream_set_timer_read(s);
 }
 
 void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
@@ -229,6 +238,7 @@ void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 		loop_stream_readable(s);
 	}
 	if (writable) {
+		// TODO do not call on_writable() if in SSL handshake?
 		s->write_blocked = false;
 		s->ops->on_writable(s);
 	}
@@ -339,6 +349,10 @@ void loop_stream_init(loop_t *loop)
 int loop_stream_fd(loop_stream_t *s)
 {
 	return s->fd;
+}
+bool loop_stream_is_closed(loop_stream_t *s)
+{
+	return s->closed;
 }
 
 void loop_stream_set_app_data(loop_stream_t *s, void *app_data)

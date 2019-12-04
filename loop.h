@@ -71,11 +71,12 @@ typedef struct loop_stream_s loop_stream_t;
  * not-processed data will be saved and passed in the next time.
  * If returns negetive (e.g. invalid message), the connection will be closed.
  *
- * field:on_read() is the only mandatory member you must set.
+ * field:on_read() or field:on_readable() is the only mandatory member you must set.
  */
 typedef struct {
 	int	(*on_read)(loop_stream_t *, void *data, int len); ///< read available handler
 	void	(*on_close)(loop_stream_t *, const char *reason, int errnum); ///< close handler
+	void	(*on_readable)(loop_stream_t *); ///< read available handler, used with loop_stream_read()
 	void	(*on_writable)(loop_stream_t *); ///< write available handler, used with loop_stream_write()
 
 	int	bufsz_read; ///< read buffer size. Use 16K if not set.
@@ -110,6 +111,15 @@ int loop_stream_write(loop_stream_t *, const void *data, int len);
 int loop_stream_sendfile(loop_stream_t *, int in_fd, off_t *offset, int len);
 
 /**
+ * @brief Read data from stream. This should be called in ops->on_readable().
+ *
+ * Return <0 if connection error or closed;
+ * Return =0 if read blocked;
+ * Return >0 as read length.
+ */
+int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len);
+
+/**
  * @brief Close a stream.
  */
 void loop_stream_close(loop_stream_t *);
@@ -118,6 +128,11 @@ void loop_stream_close(loop_stream_t *);
  * @brief Return stream's fd.
  */
 int loop_stream_fd(loop_stream_t *s);
+
+/**
+ * @brief Return if stream's closed.
+ */
+bool loop_stream_is_closed(loop_stream_t *s);
 
 /**
  * @brief Return stream's SSL.
