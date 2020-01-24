@@ -88,7 +88,8 @@ typedef struct {
 /**
  * @brief Create a stream.
  */
-loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *ops);
+loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *ops,
+		bool write_blocked);
 
 /**
  * @brief Write data to stream.
@@ -133,6 +134,16 @@ int loop_stream_fd(loop_stream_t *s);
  * @brief Return if stream's closed.
  */
 bool loop_stream_is_closed(loop_stream_t *s);
+
+/**
+ * @brief Return if stream's read-blocked.
+ */
+bool loop_stream_is_read_blocked(loop_stream_t *s);
+
+/**
+ * @brief Return if stream's write blocked.
+ */
+bool loop_stream_is_write_blocked(loop_stream_t *s);
 
 /**
  * @brief Return stream's SSL.

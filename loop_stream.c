@@ -21,6 +21,7 @@ struct loop_stream_s {
 	SSL			*ssl;
 
 	bool			closed;
+	bool			read_blocked;
 	bool			write_blocked;
 
 	wuy_event_status_t	event_status;
@@ -94,6 +95,10 @@ static void loop_stream_set_event_write(loop_stream_t *s)
 {
 	wuy_event_add_write(s->loop->event_ctx, s->fd, s, &s->event_status);
 }
+static void loop_stream_set_event_rdwr(loop_stream_t *s)
+{
+	wuy_event_add_rdwr(s->loop->event_ctx, s->fd, s, &s->event_status);
+}
 static void loop_stream_del_event_write(loop_stream_t *s)
 {
 	wuy_event_del_write(s->loop->event_ctx, s->fd, s, &s->event_status);
@@ -141,11 +146,16 @@ static void loop_stream_clear_defer(void *data)
 
 int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len)
 {
+	if (s->read_blocked) {
+		return 0;
+	}
+
 	if (s->ssl != NULL) {
 		int read_len = SSL_read(s->ssl, buffer, buf_len);
 		if (read_len <= 0) {
 			int sslerr = SSL_get_error(s->ssl, read_len);
 			if (sslerr == SSL_ERROR_WANT_READ || sslerr == SSL_ERROR_WANT_WRITE) {
+				s->read_blocked = true;
 				return 0;
 			}
 			if (sslerr == SSL_ERROR_ZERO_RETURN) {
@@ -160,6 +170,7 @@ int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len)
 		int read_len = read(s->fd, buffer, buf_len);
 		if (read_len < 0) {
 			if (errno == EAGAIN) {
+				s->read_blocked = true;
 				return 0;
 			}
 			loop_stream_close_for(s, "read error", errno);
@@ -235,6 +246,7 @@ void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 		return;
 	}
 	if (readable) {
+		s->read_blocked = false;
 		loop_stream_readable(s);
 	}
 	if (writable) {
@@ -312,7 +324,8 @@ int loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, int len)
 	return loop_stream_write_handle(s, len, write_len);
 }
 
-loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *ops)
+loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *ops,
+		bool write_blocked)
 {
 	loop_stream_t *s = wuy_pool_alloc(loop->stream_pool);
 	if (s == NULL) {
@@ -325,9 +338,15 @@ loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *op
 	s->loop = loop;
 	s->ops = ops;
 
-	/* add read event */
-	loop_stream_set_event_read(s);
-	loop_stream_set_timer_read(s);
+	if (write_blocked) {
+		s->write_blocked = true;
+		loop_stream_set_event_rdwr(s);
+		loop_stream_set_timer_read(s);
+		loop_stream_set_timer_write(s);
+	} else {
+		loop_stream_set_event_read(s);
+		loop_stream_set_timer_read(s);
+	}
 
 	return s;
 }
@@ -353,6 +372,14 @@ int loop_stream_fd(loop_stream_t *s)
 bool loop_stream_is_closed(loop_stream_t *s)
 {
 	return s->closed;
+}
+bool loop_stream_is_read_blocked(loop_stream_t *s)
+{
+	return s->read_blocked;
+}
+bool loop_stream_is_write_blocked(loop_stream_t *s)
+{
+	return s->write_blocked;
 }
 
 void loop_stream_set_app_data(loop_stream_t *s, void *app_data)

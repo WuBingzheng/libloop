@@ -30,8 +30,8 @@ void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl)
 			return;
 		}
 
-		loop_stream_t *s = loop_stream_new(tl->loop,
-				client_fd, tl->accepted_ops);
+		loop_stream_t *s = loop_stream_new(tl->loop, client_fd,
+				tl->accepted_ops, false);
 
 		if (tl->ops->on_accept) {
 			if (!tl->ops->on_accept(tl, s, &client_addr)) {
@@ -102,12 +102,14 @@ loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
 	if (!wuy_sockaddr_pton(addr, &sa, default_port)) {
 		return NULL;
 	}
+
+	errno = 0;
 	int fd = wuy_tcp_connect(&sa);
 	if (fd < 0) {
 		return NULL;
 	}
 
-	loop_stream_t *s = loop_stream_new(loop, fd, ops);
+	loop_stream_t *s = loop_stream_new(loop, fd, ops, errno == EINPROGRESS);
 	if (s == NULL) {
 		return NULL;
 	}
