@@ -17,7 +17,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <openssl/ssl.h>
+#include <openssl/ossl_typ.h>
 
 
 /* == loop == */
