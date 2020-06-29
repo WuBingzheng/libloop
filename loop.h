@@ -17,7 +17,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <openssl/ossl_typ.h>
 
 
 /* == loop == */
@@ -78,6 +77,10 @@ typedef struct {
 	void	(*on_close)(loop_stream_t *, const char *reason, int errnum); ///< close handler
 	void	(*on_readable)(loop_stream_t *); ///< read available handler, used with loop_stream_read()
 	void	(*on_writable)(loop_stream_t *); ///< write available handler, used with loop_stream_write()
+
+	int	(*underlying_read)(void *underlying, void *buffer, int len);
+	int	(*underlying_write)(void *underlying, const void *data, int len);
+	void	(*underlying_close)(void *underlying);
 
 	int	bufsz_read; ///< read buffer size. Use 16K if not set.
 
@@ -146,20 +149,6 @@ bool loop_stream_is_read_blocked(loop_stream_t *s);
 bool loop_stream_is_write_blocked(loop_stream_t *s);
 
 /**
- * @brief Return stream's SSL.
- */
-SSL *loop_stream_get_ssl(loop_stream_t *ssl);
-
-/**
- * @brief Set stream's SSL.
- *
- * Must called before running event.
- * For example, set in .on_accept() for loop_tcp_listen();
- * and in before_run() for loop_tcp_connect().
- */
-void loop_stream_set_ssl(loop_stream_t *s, SSL *ssl);
-
-/**
  * @brief Set application data to stream.
  */
 void loop_stream_set_app_data(loop_stream_t *s, void *app_data);
@@ -168,6 +157,12 @@ void loop_stream_set_app_data(loop_stream_t *s, void *app_data);
  */
 void *loop_stream_get_app_data(loop_stream_t *s);
 
+/**
+ * @brief Set stream's underlying context.
+ *
+ * Make sure that stream's ops->underlying_*() are set.
+ */
+void loop_stream_set_underlying(loop_stream_t *s, void *underlying);
 
 /* == loop.tcp == */
 

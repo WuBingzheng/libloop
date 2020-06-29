@@ -1,6 +1,9 @@
 #include <stdio.h>
+#include <openssl/ssl.h>
 #include <openssl/err.h>
 #include "loop.h"
+
+#include "ssl_underlying.c"
 
 int on_read(loop_stream_t *s, void *data, int len)
 {
@@ -29,14 +32,22 @@ int main()
 	SSL_CTX *ssl_ctx = SSL_CTX_new(SSLv23_client_method());
 	SSL_CTX_set_ecdh_auto(ssl_ctx, 1);
 
-	loop_stream_ops_t ops = { .on_read = on_read, .on_writable = on_writable, .on_close = on_close };
+	loop_stream_ops_t ops = {
+		.on_read = on_read,
+		.on_writable = on_writable,
+		.on_close = on_close,
+
+		.underlying_read = ssl_underlying_read,
+		.underlying_write = ssl_underlying_write,
+		.underlying_close = ssl_underlying_close,
+	};
 	loop_t *loop = loop_new();
 	loop_stream_t *s = loop_tcp_connect(loop, "127.0.0.1:1234", 0, &ops);
 
 	SSL *ssl = SSL_new(ssl_ctx);
 	SSL_set_fd(ssl, loop_stream_fd(s));
 	SSL_set_connect_state(ssl);
-	loop_stream_set_ssl(s, ssl);
+	loop_stream_set_underlying(s, ssl);
 
 	int len = loop_stream_write(s, "hello\n", 6);
 	printf("write first len: %d\n", len);

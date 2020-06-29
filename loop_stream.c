@@ -5,7 +5,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/sendfile.h>
-#include <openssl/ssl.h>
 
 #include "wuy_event.h"
 #include "wuy_pool.h"
@@ -18,7 +17,6 @@ struct loop_stream_s {
 	int			type; /* keep this top! */
 
 	int			fd;
-	SSL			*ssl;
 
 	bool			closed;
 	bool			read_blocked;
@@ -35,6 +33,8 @@ struct loop_stream_s {
 	wuy_list_node_t		list_node;
 
 	const loop_stream_ops_t	*ops;
+
+	void			*underlying;
 
 	loop_t			*loop;
 	void			*app_data;
@@ -119,10 +119,10 @@ static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errn
 	if (s->ops->on_close != NULL) {
 		s->ops->on_close(s, reason, errnum);
 	}
-
-	if (s->ssl != NULL) {
-		SSL_free(s->ssl);
+	if (s->underlying != NULL) {
+		s->ops->underlying_close(s->underlying);
 	}
+
 	loop_stream_del_event(s);
 	close(s->fd);
 
@@ -150,38 +150,26 @@ int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len)
 		return 0;
 	}
 
-	if (s->ssl != NULL) {
-		int read_len = SSL_read(s->ssl, buffer, buf_len);
-		if (read_len <= 0) {
-			int sslerr = SSL_get_error(s->ssl, read_len);
-			if (sslerr == SSL_ERROR_WANT_READ || sslerr == SSL_ERROR_WANT_WRITE) {
-				s->read_blocked = true;
-				return 0;
-			}
-			if (sslerr == SSL_ERROR_ZERO_RETURN) {
-				loop_stream_close_for(s, "peer close", 0);
-				return -1;
-			}
-			loop_stream_close_for(s, "SSL read error", sslerr);
-			return -2;
-		}
-		return read_len;
+	int read_len;
+	if (s->underlying != NULL) {
+		read_len = s->ops->underlying_read(s->underlying, buffer, buf_len);
 	} else {
-		int read_len = read(s->fd, buffer, buf_len);
-		if (read_len < 0) {
-			if (errno == EAGAIN) {
-				s->read_blocked = true;
-				return 0;
-			}
-			loop_stream_close_for(s, "read error", errno);
-			return -1;
-		}
-		if (read_len == 0) {
-			loop_stream_close_for(s, "peer close", 0);
-			return -2;
-		}
-		return read_len;
+		read_len = read(s->fd, buffer, buf_len);
 	}
+
+	if (read_len < 0) {
+		if (errno == EAGAIN) {
+			s->read_blocked = true;
+			return 0;
+		}
+		loop_stream_close_for(s, "read error", errno);
+		return -1;
+	}
+	if (read_len == 0) {
+		loop_stream_close_for(s, "peer close", 0);
+		return -2;
+	}
+	return read_len;
 }
 
 static void loop_stream_readable(loop_stream_t *s)
@@ -287,21 +275,15 @@ int loop_stream_write(loop_stream_t *s, const void *data, int len)
 	}
 
 	int write_len;
-	if (s->ssl != NULL) {
-		write_len = SSL_write(s->ssl, data, len);
-		if (write_len <= 0) {
-			int sslerr = SSL_get_error(s->ssl, write_len);
-			if (sslerr != SSL_ERROR_WANT_READ && sslerr != SSL_ERROR_WANT_WRITE) {
-				loop_stream_close_for(s, "SSL write error", sslerr);
-				return -1;
-			}
-		}
+	if (s->underlying != NULL) {
+		write_len = s->ops->underlying_write(s->underlying, data, len);
 	} else {
 		write_len = write(s->fd, data, len);
-		if (write_len < 0 && errno != EAGAIN) {
-			loop_stream_close_for(s, "write error", errno);
-			return write_len;
-		}
+	}
+
+	if (write_len < 0 && errno != EAGAIN) {
+		loop_stream_close_for(s, "write error", errno);
+		return write_len;
 	}
 	return loop_stream_write_handle(s, len, write_len);
 }
@@ -314,7 +296,7 @@ int loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, int len)
 	if (s->write_blocked) {
 		return 0;
 	}
-	assert(s->ssl == NULL);
+	assert(s->underlying == NULL);
 
 	int write_len = sendfile(s->fd, in_fd, offset, len);
 	if (write_len < 0 && errno != EAGAIN) {
@@ -391,11 +373,10 @@ void *loop_stream_get_app_data(loop_stream_t *s)
 	return s->app_data;
 }
 
-SSL *loop_stream_get_ssl(loop_stream_t *s)
+void loop_stream_set_underlying(loop_stream_t *s, void *underlying)
 {
-	return s->ssl;
-}
-void loop_stream_set_ssl(loop_stream_t *s, SSL *ssl)
-{
-	s->ssl = ssl;
+	assert(s->ops->underlying_read != NULL);
+	assert(s->ops->underlying_write != NULL);
+	assert(s->ops->underlying_close != NULL);
+	s->underlying = underlying;
 }
