@@ -16,8 +16,6 @@ struct loop_timer_s {
 
 void loop_timer_init(loop_t *loop)
 {
-	loop->timer_pool = wuy_pool_new_type(loop_timer_t);
-
 	loop->timer_ctx = wuy_heap_new_type(WUY_HEAP_KEY_INT64,
 			offsetof(loop_timer_t, expire), false,
 			offsetof(loop_timer_t, heap_node));
@@ -32,7 +30,7 @@ static int64_t loop_timer_now(void)
 
 loop_timer_t *loop_timer_new(loop_t *loop, loop_timer_f *handler, void *data)
 {
-	loop_timer_t *timer = wuy_pool_alloc(loop->timer_pool);
+	loop_timer_t *timer = malloc(sizeof(loop_timer_t));
 	if (timer == NULL) {
 		return NULL;
 	}
@@ -59,7 +57,7 @@ void loop_timer_delete(loop_timer_t *timer)
 		return;
 	}
 	wuy_heap_delete(timer->ctx, timer);
-	wuy_pool_free(timer);
+	free(timer);
 }
 
 int64_t loop_timer_expire(loop_timer_ctx_t *ctx)

@@ -7,7 +7,6 @@
 #include <sys/sendfile.h>
 
 #include "wuy_event.h"
-#include "wuy_pool.h"
 #include "wuy_list.h"
 
 #include "loop_internal.h"
@@ -140,7 +139,7 @@ static void loop_stream_clear_defer(void *data)
 	wuy_list_node_t *node;
 	wuy_list_iter_first(head, node) {
 		wuy_list_delete(node);
-		wuy_pool_free(wuy_containerof(node, loop_stream_t, list_node));
+		free(wuy_containerof(node, loop_stream_t, list_node));
 	}
 }
 
@@ -309,7 +308,7 @@ int loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, int len)
 loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *ops,
 		bool write_blocked)
 {
-	loop_stream_t *s = wuy_pool_alloc(loop->stream_pool);
+	loop_stream_t *s = malloc(sizeof(loop_stream_t));
 	if (s == NULL) {
 		return NULL;
 	}
@@ -340,8 +339,6 @@ void loop_stream_close(loop_stream_t *s)
 
 void loop_stream_init(loop_t *loop)
 {
-	loop->stream_pool = wuy_pool_new_type(loop_stream_t);
-
 	wuy_list_init(&loop->stream_defer_head);
 
 	loop_idle_add(loop, loop_stream_clear_defer, &loop->stream_defer_head);

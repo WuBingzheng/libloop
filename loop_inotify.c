@@ -36,7 +36,7 @@ static loop_inotify_t *loop_inotify_inside_get(loop_inotify_t *parent, char *nam
 	}
 
 	/* create one */
-	inside = wuy_pool_alloc(loop->inotify_pool);
+	inside = malloc(sizeof(loop_inotify_t));
 	if (inside == NULL) {
 		return NULL;
 	}
@@ -108,21 +108,21 @@ void loop_inotify_event_handler(void *data)
 loop_inotify_t *loop_inotify_add(loop_t *loop, const char *pathname,
 		loop_inotify_ops_t *ops)
 {
-	loop_inotify_t *in = wuy_pool_alloc(loop->inotify_pool);
+	loop_inotify_t *in = malloc(sizeof(loop_inotify_t));
 	if (in == NULL) {
 		return NULL;
 	}
 
 	in->name = strdup(pathname);
 	if (in->name == NULL) {
-		wuy_pool_free(in);
+		free(in);
 		return NULL;
 	}
 
 	in->wd = inotify_add_watch(loop->inotify_fd, pathname, ops->mask);
 	if (in->wd < 0) {
 		free(in->name);
-		wuy_pool_free(in);
+		free(in);
 		return NULL;
 	}
 
@@ -169,7 +169,7 @@ static void loop_inotify_clear_defer(void *data)
 	wuy_list_node_t *node;
 	wuy_list_iter_first(head, node) {
 		wuy_list_delete(node);
-		wuy_pool_free(wuy_containerof(node, loop_inotify_t, list_node));
+		free(wuy_containerof(node, loop_inotify_t, list_node));
 	}
 }
 
@@ -187,8 +187,6 @@ static bool loop_inotify_dict_inside_equal(const void *a, const void *b)
 
 void loop_inotify_init(loop_t *loop)
 {
-	loop->inotify_pool = wuy_pool_new_type(loop_inotify_t);
-
 	loop->inotify_fd = inotify_init1(IN_NONBLOCK);
 	assert(loop->inotify_fd >= 0);
 
