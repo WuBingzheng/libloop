@@ -377,3 +377,7 @@ void loop_stream_set_underlying(loop_stream_t *s, void *underlying)
 	assert(s->ops->underlying_close != NULL);
 	s->underlying = underlying;
 }
+void *loop_stream_get_underlying(loop_stream_t *s)
+{
+	return s->underlying;
+}

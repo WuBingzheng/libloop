@@ -163,6 +163,10 @@ void *loop_stream_get_app_data(loop_stream_t *s);
  * Make sure that stream's ops->underlying_*() are set.
  */
 void loop_stream_set_underlying(loop_stream_t *s, void *underlying);
+/**
+ * @brief Get stream's underlying context.
+ */
+void *loop_stream_get_underlying(loop_stream_t *s);
 
 /* == loop.tcp == */
 
