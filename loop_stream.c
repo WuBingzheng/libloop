@@ -145,6 +145,9 @@ static void loop_stream_clear_defer(void *data)
 
 int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len)
 {
+	if (s->closed) {
+		return -1;
+	}
 	if (s->read_blocked) {
 		return 0;
 	}

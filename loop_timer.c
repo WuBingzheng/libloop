@@ -37,6 +37,7 @@ loop_timer_t *loop_timer_new(loop_t *loop, loop_timer_f *handler, void *data)
 	timer->handler = handler;
 	timer->ctx = loop->timer_ctx;
 	timer->data = data;
+	timer->heap_node.index = 0;
 	return timer;
 }
 
