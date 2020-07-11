@@ -136,10 +136,9 @@ static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errn
 static void loop_stream_clear_defer(void *data)
 {
 	wuy_list_t *head = data;
-	wuy_list_node_t *node;
-	wuy_list_iter_first(head, node) {
-		wuy_list_delete(node);
-		free(wuy_containerof(node, loop_stream_t, list_node));
+	loop_stream_t *s;
+	while (wuy_list_pop_type(head, s, list_node)) {
+		free(s);
 	}
 }
 

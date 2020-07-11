@@ -152,9 +152,9 @@ void loop_inotify_delete(loop_inotify_t *in)
 		inotify_rm_watch(loop->inotify_fd, in->wd);
 		wuy_dict_delete(loop->wd_inotify, in);
 
-		wuy_list_node_t *n;
-		wuy_list_iter(&in->inside_head, n) {
-			loop_inotify_delete(wuy_containerof(n, loop_inotify_t, list_node));
+		loop_inotify_t *ii, *safe;
+		wuy_list_iter_safe_type(&in->inside_head, ii, safe, list_node) {
+			loop_inotify_delete(ii);
 		}
 	} else {
 		wuy_list_delete(&in->list_node);
@@ -166,10 +166,9 @@ void loop_inotify_delete(loop_inotify_t *in)
 static void loop_inotify_clear_defer(void *data)
 {
 	wuy_list_t *head = data;
-	wuy_list_node_t *node;
-	wuy_list_iter_first(head, node) {
-		wuy_list_delete(node);
-		free(wuy_containerof(node, loop_inotify_t, list_node));
+	loop_inotify_t *ii;
+	while (wuy_list_pop_type(head, ii, list_node)) {
+		free(ii);
 	}
 }
 
