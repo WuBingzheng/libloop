@@ -231,15 +231,17 @@ static void loop_stream_readable(loop_stream_t *s)
 
 void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 {
-	if (s->closed) {
-		return;
-	}
 	if (readable) {
+		if (s->closed) {
+			return;
+		}
 		s->read_blocked = false;
 		loop_stream_readable(s);
 	}
 	if (writable) {
-		// TODO do not call on_writable() if in SSL handshake?
+		if (s->closed) {
+			return;
+		}
 		s->write_blocked = false;
 		s->ops->on_writable(s);
 	}
