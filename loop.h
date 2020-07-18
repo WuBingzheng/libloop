@@ -67,8 +67,7 @@ typedef struct loop_stream_s loop_stream_t;
  */
 enum loop_stream_close_reason {
 	LOOP_STREAM_APP_CLOSE = 1,
-	LOOP_STREAM_READ_TIMEOUT,
-	LOOP_STREAM_WRITE_TIMEOUT,
+	LOOP_STREAM_TIMEOUT,
 	LOOP_STREAM_READ_ERROR,
 	LOOP_STREAM_PEER_CLOSE,
 	LOOP_STREAM_APP_READ_ERROR,
@@ -106,8 +105,7 @@ typedef struct {
 
 	int	bufsz_read; ///< read buffer size. Use 16K if not set.
 
-	int	tmo_read;   ///< read timeout in millisecond. Use 10*1000 if not set. No timeout if negative.
-	int	tmo_write;  ///< write timeout in millisecond. Use 10*1000 if not set. No timeout if negative.
+	int	timeout;   ///< active timeout in millisecond. Set 0 to disable.
 } loop_stream_ops_t;
 
 /**

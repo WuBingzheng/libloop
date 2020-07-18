@@ -23,8 +23,7 @@ struct loop_stream_s {
 
 	wuy_event_status_t	event_status;
 
-	loop_timer_t		*timer_read;
-	loop_timer_t		*timer_write;
+	loop_timer_t		*timer;
 
 	void			*read_buffer;
 	int			read_buf_len;
@@ -40,50 +39,6 @@ struct loop_stream_s {
 };
 
 static void loop_stream_close_for(loop_stream_t *s, enum loop_stream_close_reason reason);
-
-/* timer utils */
-static int64_t loop_stream_read_timeout(int64_t at, void *data)
-{
-	loop_stream_t *s = data;
-	loop_stream_close_for(s, LOOP_STREAM_READ_TIMEOUT);
-	return 0;
-}
-static int64_t loop_stream_write_timeout(int64_t at, void *data)
-{
-	loop_stream_t *s = data;
-	loop_stream_close_for(s, LOOP_STREAM_WRITE_TIMEOUT);
-	return 0;
-}
-static void loop_stream_set_timer_read(loop_stream_t *s)
-{
-	if (s->ops->tmo_read < 0) {
-		return;
-	}
-	if (s->timer_read == NULL) {
-		s->timer_read = loop_timer_new(s->loop, loop_stream_read_timeout, s);
-	}
-	loop_timer_set_after(s->timer_read, s->ops->tmo_read ? s->ops->tmo_read : 10*1000);
-}
-static void loop_stream_set_timer_write(loop_stream_t *s)
-{
-	if (s->ops->tmo_write < 0) {
-		return;
-	}
-	if (s->timer_write == NULL) {
-		s->timer_write = loop_timer_new(s->loop, loop_stream_write_timeout, s);
-	}
-	loop_timer_set_after(s->timer_write, s->ops->tmo_write ? s->ops->tmo_write : 10*1000);
-}
-static void loop_stream_del_timer_read(loop_stream_t *s)
-{
-	loop_timer_delete(s->timer_read);
-	s->timer_read = NULL;
-}
-static void loop_stream_del_timer_write(loop_stream_t *s)
-{
-	loop_timer_delete(s->timer_write);
-	s->timer_write = NULL;
-}
 
 /* event utils */
 static void loop_stream_set_event_read(loop_stream_t *s)
@@ -107,6 +62,11 @@ static void loop_stream_del_event(loop_stream_t *s)
 	wuy_event_del(s->loop->event_ctx, s->fd, &s->event_status);
 }
 
+static int64_t loop_stream_timeout_handler(int64_t at, void *s)
+{
+	loop_stream_close_for(s, LOOP_STREAM_TIMEOUT);
+	return 0;
+}
 
 static void loop_stream_close_for(loop_stream_t *s, enum loop_stream_close_reason reason)
 {
@@ -127,8 +87,10 @@ static void loop_stream_close_for(loop_stream_t *s, enum loop_stream_close_reaso
 
 	free(s->read_buffer);
 
-	loop_stream_del_timer_read(s);
-	loop_stream_del_timer_write(s);
+	if (s->timer != NULL) {
+		loop_timer_delete(s->timer);
+		s->timer = NULL;
+	}
 
 	wuy_list_insert(&s->loop->stream_defer_head, &s->list_node);
 }
@@ -176,7 +138,6 @@ int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len)
 static void loop_stream_readable(loop_stream_t *s)
 {
 	loop_stream_set_event_read(s);
-	loop_stream_set_timer_read(s);
 
 	if (s->ops->on_readable != NULL) {
 		s->ops->on_readable(s);
@@ -231,6 +192,10 @@ static void loop_stream_readable(loop_stream_t *s)
 
 void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 {
+	if (s->timer != NULL) {
+		loop_timer_set_after(s->timer, s->ops->timeout);
+	}
+
 	if (readable) {
 		if (s->closed) {
 			return;
@@ -251,7 +216,6 @@ static int loop_stream_write_handle(loop_stream_t *s, int data_len, int write_le
 {
 	if (write_len == data_len) {
 		loop_stream_del_event_write(s);
-		loop_stream_del_timer_write(s);
 		return write_len;
 	}
 
@@ -264,7 +228,6 @@ static int loop_stream_write_handle(loop_stream_t *s, int data_len, int write_le
 		return -1;
 	}
 	loop_stream_set_event_write(s);
-	loop_stream_set_timer_write(s);
 	return write_len < 0 ? 0 : write_len;
 }
 
@@ -323,14 +286,16 @@ loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *op
 	s->loop = loop;
 	s->ops = ops;
 
+	if (s->ops->timeout > 0) {
+		s->timer = loop_timer_new(s->loop, loop_stream_timeout_handler, s);
+		loop_timer_set_after(s->timer, s->ops->timeout);
+	}
+
 	if (write_blocked) {
 		s->write_blocked = true;
 		loop_stream_set_event_rdwr(s);
-		loop_stream_set_timer_read(s);
-		loop_stream_set_timer_write(s);
 	} else {
 		loop_stream_set_event_read(s);
-		loop_stream_set_timer_read(s);
 	}
 
 	return s;
@@ -390,8 +355,7 @@ const char *loop_stream_close_string(enum loop_stream_close_reason reason)
 {
 	switch (reason) {
 	case LOOP_STREAM_APP_CLOSE: return "app close";
-	case LOOP_STREAM_READ_TIMEOUT: return "read timeout";
-	case LOOP_STREAM_WRITE_TIMEOUT: return "write timeout";
+	case LOOP_STREAM_TIMEOUT: return "timeout";
 	case LOOP_STREAM_READ_ERROR: return "read error";
 	case LOOP_STREAM_PEER_CLOSE: return "peer close";
 	case LOOP_STREAM_APP_READ_ERROR: return "app read error";
