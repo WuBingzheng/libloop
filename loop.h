@@ -63,6 +63,28 @@ bool loop_idle_add(loop_t *loop, loop_idle_f *func, void *data);
 typedef struct loop_stream_s loop_stream_t;
 
 /**
+ * @brief Reasons of stream close, used by loop_stream_ops_t.on_close().
+ */
+enum loop_stream_close_reason {
+	LOOP_STREAM_APP_CLOSE = 1,
+	LOOP_STREAM_READ_TIMEOUT,
+	LOOP_STREAM_WRITE_TIMEOUT,
+	LOOP_STREAM_READ_ERROR,
+	LOOP_STREAM_PEER_CLOSE,
+	LOOP_STREAM_APP_READ_ERROR,
+	LOOP_STREAM_APP_INVALID_RETURN,
+	LOOP_STREAM_READ_BUFFER_FULL,
+	LOOP_STREAM_WRITE_BLOCK,
+	LOOP_STREAM_WRITE_ERROR,
+	LOOP_STREAM_SENDFILE_ERROR,
+};
+
+/**
+ * @brief Explain close reason to string.
+ */
+const char *loop_stream_close_string(enum loop_stream_close_reason reason);
+
+/**
  * @brief Stream type operations and settings.
  *
  * field:on_read() should return the processed data length. If the returned
@@ -74,7 +96,7 @@ typedef struct loop_stream_s loop_stream_t;
  */
 typedef struct {
 	int	(*on_read)(loop_stream_t *, void *data, int len); ///< read available handler
-	void	(*on_close)(loop_stream_t *, const char *reason, int errnum); ///< close handler
+	void	(*on_close)(loop_stream_t *, enum loop_stream_close_reason); ///< close handler
 	void	(*on_readable)(loop_stream_t *); ///< read available handler, used with loop_stream_read()
 	void	(*on_writable)(loop_stream_t *); ///< write available handler, used with loop_stream_write()
 

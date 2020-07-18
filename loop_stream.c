@@ -39,19 +39,19 @@ struct loop_stream_s {
 	void			*app_data;
 };
 
-static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errnum);
+static void loop_stream_close_for(loop_stream_t *s, enum loop_stream_close_reason reason);
 
 /* timer utils */
 static int64_t loop_stream_read_timeout(int64_t at, void *data)
 {
 	loop_stream_t *s = data;
-	loop_stream_close_for(s, "read timedout", 0);
+	loop_stream_close_for(s, LOOP_STREAM_READ_TIMEOUT);
 	return 0;
 }
 static int64_t loop_stream_write_timeout(int64_t at, void *data)
 {
 	loop_stream_t *s = data;
-	loop_stream_close_for(s, "write timedout", 0);
+	loop_stream_close_for(s, LOOP_STREAM_WRITE_TIMEOUT);
 	return 0;
 }
 static void loop_stream_set_timer_read(loop_stream_t *s)
@@ -108,15 +108,15 @@ static void loop_stream_del_event(loop_stream_t *s)
 }
 
 
-static void loop_stream_close_for(loop_stream_t *s, const char *reason, int errnum)
+static void loop_stream_close_for(loop_stream_t *s, enum loop_stream_close_reason reason)
 {
 	if (s->closed) {
 		return;
 	}
 	s->closed = true;
 
-	if (s->ops->on_close != NULL) {
-		s->ops->on_close(s, reason, errnum);
+	if (reason != LOOP_STREAM_APP_CLOSE && s->ops->on_close != NULL) {
+		s->ops->on_close(s, reason);
 	}
 	if (s->underlying != NULL) {
 		s->ops->underlying_close(s->underlying);
@@ -163,11 +163,11 @@ int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len)
 			s->read_blocked = true;
 			return 0;
 		}
-		loop_stream_close_for(s, "read error", errno);
+		loop_stream_close_for(s, LOOP_STREAM_READ_ERROR);
 		return -1;
 	}
 	if (read_len == 0) {
-		loop_stream_close_for(s, "peer close", 0);
+		loop_stream_close_for(s, LOOP_STREAM_PEER_CLOSE);
 		return -2;
 	}
 	return read_len;
@@ -201,18 +201,18 @@ static void loop_stream_readable(loop_stream_t *s)
 		read_len += prev_len;
 		int proc_len = s->ops->on_read(s, buffer, read_len);
 		if (proc_len < 0) {
-			loop_stream_close_for(s, "app read error", 0);
+			loop_stream_close_for(s, LOOP_STREAM_APP_READ_ERROR);
 			return;
 		}
 		if (proc_len > read_len) {
-			loop_stream_close_for(s, "app read invalid return", 0);
+			loop_stream_close_for(s, LOOP_STREAM_APP_INVALID_RETURN);
 			return;
 		}
 
 		prev_buf = buffer + proc_len;
 		prev_len = read_len - proc_len;
 		if (prev_len == sizeof(buffer)) {
-			loop_stream_close_for(s, "read buffer full", 0);
+			loop_stream_close_for(s, LOOP_STREAM_READ_BUFFER_FULL);
 			return;
 		}
 	}
@@ -260,7 +260,7 @@ static int loop_stream_write_handle(loop_stream_t *s, int data_len, int write_le
 	s->write_blocked = true;
 
 	if (s->ops->on_writable == NULL) {
-		loop_stream_close_for(s, "write blocks", errno);
+		loop_stream_close_for(s, LOOP_STREAM_WRITE_BLOCK);
 		return -1;
 	}
 	loop_stream_set_event_write(s);
@@ -285,7 +285,7 @@ int loop_stream_write(loop_stream_t *s, const void *data, int len)
 	}
 
 	if (write_len < 0 && errno != EAGAIN) {
-		loop_stream_close_for(s, "write error", errno);
+		loop_stream_close_for(s, LOOP_STREAM_WRITE_ERROR);
 		return write_len;
 	}
 	return loop_stream_write_handle(s, len, write_len);
@@ -303,7 +303,7 @@ int loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, int len)
 
 	int write_len = sendfile(s->fd, in_fd, offset, len);
 	if (write_len < 0 && errno != EAGAIN) {
-		loop_stream_close_for(s, "sendfile error", errno);
+		loop_stream_close_for(s, LOOP_STREAM_SENDFILE_ERROR);
 		return write_len;
 	}
 	return loop_stream_write_handle(s, len, write_len);
@@ -338,7 +338,7 @@ loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *op
 
 void loop_stream_close(loop_stream_t *s)
 {
-	loop_stream_close_for(s, "app close", 0);
+	loop_stream_close_for(s, LOOP_STREAM_APP_CLOSE);
 }
 
 void loop_stream_init(loop_t *loop)
@@ -384,4 +384,22 @@ void loop_stream_set_underlying(loop_stream_t *s, void *underlying)
 void *loop_stream_get_underlying(loop_stream_t *s)
 {
 	return s->underlying;
+}
+
+const char *loop_stream_close_string(enum loop_stream_close_reason reason)
+{
+	switch (reason) {
+	case LOOP_STREAM_APP_CLOSE: return "app close";
+	case LOOP_STREAM_READ_TIMEOUT: return "read timeout";
+	case LOOP_STREAM_WRITE_TIMEOUT: return "write timeout";
+	case LOOP_STREAM_READ_ERROR: return "read error";
+	case LOOP_STREAM_PEER_CLOSE: return "peer close";
+	case LOOP_STREAM_APP_READ_ERROR: return "app read error";
+	case LOOP_STREAM_APP_INVALID_RETURN: return "app invalid return";
+	case LOOP_STREAM_READ_BUFFER_FULL: return "read buffer full";
+	case LOOP_STREAM_WRITE_BLOCK: return "write block";
+	case LOOP_STREAM_WRITE_ERROR: return "write error";
+	case LOOP_STREAM_SENDFILE_ERROR: return "sendfile error";
+	default: abort();
+	}
 }
