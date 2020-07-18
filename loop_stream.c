@@ -193,7 +193,7 @@ static void loop_stream_readable(loop_stream_t *s)
 void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 {
 	if (s->timer != NULL) {
-		loop_timer_set_after(s->timer, s->ops->timeout);
+		loop_timer_set_after(s->timer, s->ops->timeout_ms);
 	}
 
 	if (readable) {
@@ -286,9 +286,9 @@ loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *op
 	s->loop = loop;
 	s->ops = ops;
 
-	if (s->ops->timeout > 0) {
+	if (s->ops->timeout_ms > 0) {
 		s->timer = loop_timer_new(s->loop, loop_stream_timeout_handler, s);
-		loop_timer_set_after(s->timer, s->ops->timeout);
+		loop_timer_set_after(s->timer, s->ops->timeout_ms);
 	}
 
 	if (write_blocked) {

@@ -19,9 +19,9 @@ void on_writable(loop_stream_t *s)
 	printf("write len: %d\n", len);
 }
 
-void on_close(loop_stream_t *s, const char *reason, int err)
+void on_close(loop_stream_t *s, enum loop_stream_close_reason reason)
 {
-	printf("close for %s: %d %s\n", reason, err, ERR_reason_error_string(err));
+	printf("close for %s\n", loop_stream_close_string(reason));
 }
 
 int main()

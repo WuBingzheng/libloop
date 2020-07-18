@@ -35,6 +35,7 @@ int main()
 
 	loop_tcp_listen_ops_t ops = { .on_accept = on_accept };
 	loop_stream_ops_t stream_ops = {
+		.timeout_ms = 10 * 1000,
 		.on_read = on_read,
 		.underlying_read = ssl_underlying_read,
 		.underlying_write = ssl_underlying_write,

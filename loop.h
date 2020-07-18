@@ -105,7 +105,7 @@ typedef struct {
 
 	int	bufsz_read; ///< read buffer size. Use 16K if not set.
 
-	int	timeout;   ///< active timeout in millisecond. Set 0 to disable.
+	int	timeout_ms;   ///< active timeout in millisecond. Set 0 to disable.
 } loop_stream_ops_t;
 
 /**

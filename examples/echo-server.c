@@ -9,7 +9,7 @@ int on_read(loop_stream_t *s, void *data, int len)
 
 int main()
 {
-	loop_stream_ops_t ops = { .on_read = on_read };
+	loop_stream_ops_t ops = { .on_read = on_read, .timeout_ms = 10*1000 };
 	loop_t *loop = loop_new();
 	loop_tcp_listen(loop, "1234", NULL, &ops);
 	loop_run(loop);
