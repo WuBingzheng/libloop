@@ -107,7 +107,7 @@ static void loop_stream_clear_defer(void *data)
 int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len)
 {
 	if (s->closed) {
-		return -1;
+		return -LOOP_STREAM_CLOSED_YET;
 	}
 	if (s->read_blocked) {
 		return 0;
@@ -126,19 +126,17 @@ int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len)
 			return 0;
 		}
 		loop_stream_close_for(s, LOOP_STREAM_READ_ERROR);
-		return -1;
+		return -LOOP_STREAM_READ_ERROR;
 	}
 	if (read_len == 0) {
 		loop_stream_close_for(s, LOOP_STREAM_PEER_CLOSE);
-		return -2;
+		return -LOOP_STREAM_PEER_CLOSE;
 	}
 	return read_len;
 }
 
 static void loop_stream_readable(loop_stream_t *s)
 {
-	loop_stream_set_event_read(s);
-
 	if (s->ops->on_readable != NULL) {
 		s->ops->on_readable(s);
 		return;
@@ -214,19 +212,19 @@ void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 
 static int loop_stream_write_handle(loop_stream_t *s, int data_len, int write_len)
 {
+	/* write finishes */
 	if (write_len == data_len) {
 		loop_stream_del_event_write(s);
 		return write_len;
 	}
 
-	/* set write-block */
-
-	s->write_blocked = true;
-
+	/* write blocks */
 	if (s->ops->on_writable == NULL) {
 		loop_stream_close_for(s, LOOP_STREAM_WRITE_BLOCK);
-		return -1;
+		return -LOOP_STREAM_WRITE_BLOCK;
 	}
+
+	s->write_blocked = true;
 	loop_stream_set_event_write(s);
 	return write_len < 0 ? 0 : write_len;
 }
@@ -234,7 +232,7 @@ static int loop_stream_write_handle(loop_stream_t *s, int data_len, int write_le
 int loop_stream_write(loop_stream_t *s, const void *data, int len)
 {
 	if (s->closed) {
-		return -1;
+		return -LOOP_STREAM_CLOSED_YET;
 	}
 	if (s->write_blocked) {
 		return 0;
@@ -249,7 +247,7 @@ int loop_stream_write(loop_stream_t *s, const void *data, int len)
 
 	if (write_len < 0 && errno != EAGAIN) {
 		loop_stream_close_for(s, LOOP_STREAM_WRITE_ERROR);
-		return write_len;
+		return -LOOP_STREAM_WRITE_ERROR;
 	}
 	return loop_stream_write_handle(s, len, write_len);
 }
@@ -257,7 +255,7 @@ int loop_stream_write(loop_stream_t *s, const void *data, int len)
 int loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, int len)
 {
 	if (s->closed) {
-		return -1;
+		return -LOOP_STREAM_CLOSED_YET;
 	}
 	if (s->write_blocked) {
 		return 0;
@@ -267,7 +265,7 @@ int loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, int len)
 	int write_len = sendfile(s->fd, in_fd, offset, len);
 	if (write_len < 0 && errno != EAGAIN) {
 		loop_stream_close_for(s, LOOP_STREAM_SENDFILE_ERROR);
-		return write_len;
+		return -LOOP_STREAM_SENDFILE_ERROR;
 	}
 	return loop_stream_write_handle(s, len, write_len);
 }
@@ -275,6 +273,8 @@ int loop_stream_sendfile(loop_stream_t *s, int in_fd, off_t *offset, int len)
 loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *ops,
 		bool write_blocked)
 {
+	assert((ops->on_read == NULL) != (ops->on_readable == NULL));
+
 	loop_stream_t *s = malloc(sizeof(loop_stream_t));
 	if (s == NULL) {
 		return NULL;
@@ -364,6 +364,7 @@ const char *loop_stream_close_string(enum loop_stream_close_reason reason)
 	case LOOP_STREAM_WRITE_BLOCK: return "write block";
 	case LOOP_STREAM_WRITE_ERROR: return "write error";
 	case LOOP_STREAM_SENDFILE_ERROR: return "sendfile error";
+	case LOOP_STREAM_CLOSED_YET: return "closed yet";
 	default: abort();
 	}
 }
