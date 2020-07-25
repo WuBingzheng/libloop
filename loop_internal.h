@@ -31,6 +31,7 @@ void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl);
 typedef wuy_heap_t loop_timer_ctx_t;
 void loop_timer_init(loop_t *loop);
 int64_t loop_timer_expire(loop_timer_ctx_t *ctx);
+int64_t loop_timer_next(loop_timer_ctx_t *ctx);
 
 /* inotify */
 void loop_inotify_init(loop_t *loop);
