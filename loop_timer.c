@@ -52,23 +52,27 @@ bool loop_timer_set_after(loop_timer_t *timer, int64_t after)
 	return loop_timer_set_at(timer, after + loop_timer_now());
 }
 
-void loop_timer_delete(loop_timer_t *timer)
+void loop_timer_suspend(loop_timer_t *timer)
 {
 	if (timer == NULL) {
 		return;
 	}
 	wuy_heap_delete(timer->ctx, timer);
+}
+void loop_timer_delete(loop_timer_t *timer)
+{
+	loop_timer_suspend(timer);
 	free(timer);
 }
 
 int64_t loop_timer_expire(loop_timer_ctx_t *ctx)
 {
-	int64_t now = loop_timer_now();
 	while (1) {
 		loop_timer_t *timer = wuy_heap_min(ctx);
 		if (timer == NULL) {
 			return -1;
 		}
+		int64_t now = loop_timer_now();
 		if (timer->expire > now) {
 			return timer->expire - now;
 		}
@@ -81,4 +85,14 @@ int64_t loop_timer_expire(loop_timer_ctx_t *ctx)
 			loop_timer_delete(timer);
 		}
 	}
+}
+
+int64_t loop_timer_next(loop_timer_ctx_t *ctx)
+{
+	loop_timer_t *timer = wuy_heap_min(ctx);
+	if (timer == NULL) {
+		return -1;
+	}
+	int64_t now = loop_timer_now();
+	return timer->expire > now ? timer->expire - now : 0;
 }

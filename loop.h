@@ -305,6 +305,11 @@ bool loop_timer_set_at(loop_timer_t *timer, int64_t at);
 bool loop_timer_set_after(loop_timer_t *timer, int64_t after);
 
 /**
+ * @brief Suspend the timer.
+ */
+void loop_timer_suspend(loop_timer_t *timer);
+
+/**
  * @brief Delete the timer.
  */
 void loop_timer_delete(loop_timer_t *timer);
