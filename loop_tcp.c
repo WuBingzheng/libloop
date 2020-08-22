@@ -63,8 +63,7 @@ loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 		return NULL;
 	}
 
-	int defer = ops->tmo_defer ? ops->tmo_defer : accepted_ops->tmo_read;
-	wuy_tcp_set_defer_accept(fd, defer);
+	wuy_tcp_set_defer_accept(fd, ops->defer ? ops->defer : 10);
 
 	/* add event */
 	loop_tcp_listen_t *tl = malloc(sizeof(loop_tcp_listen_t));
@@ -95,6 +94,24 @@ void *loop_tcp_listen_get_app_data(loop_tcp_listen_t *tl)
 	return tl->app_data;
 }
 
+loop_stream_t *loop_tcp_connect_sockaddr(loop_t *loop, struct sockaddr *sa,
+		const loop_stream_ops_t *ops)
+{
+	errno = 0;
+	int fd = wuy_tcp_connect(sa);
+	if (fd < 0) {
+		return NULL;
+	}
+
+	loop_stream_t *s = loop_stream_new(loop, fd, ops, errno == EINPROGRESS);
+	if (s == NULL) {
+		close(fd);
+		return NULL;
+	}
+
+	return s;
+}
+
 loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
 		unsigned short default_port, const loop_stream_ops_t *ops)
 {
@@ -102,17 +119,5 @@ loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
 	if (!wuy_sockaddr_pton(addr, &sa, default_port)) {
 		return NULL;
 	}
-
-	errno = 0;
-	int fd = wuy_tcp_connect(&sa);
-	if (fd < 0) {
-		return NULL;
-	}
-
-	loop_stream_t *s = loop_stream_new(loop, fd, ops, errno == EINPROGRESS);
-	if (s == NULL) {
-		return NULL;
-	}
-
-	return s;
+	return loop_tcp_connect_sockaddr(loop, &sa, ops);
 }

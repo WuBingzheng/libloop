@@ -145,6 +145,11 @@ int loop_stream_sendfile(loop_stream_t *, int in_fd, off_t *offset, int len);
 int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len);
 
 /**
+ * @brief Set timer.
+ */
+void loop_stream_set_timeout(loop_stream_t *s, int timeout_ms);
+
+/**
  * @brief Close a stream.
  */
 void loop_stream_close(loop_stream_t *);
@@ -205,7 +210,7 @@ typedef struct {
 	bool	(*on_accept)(loop_tcp_listen_t *, loop_stream_t *,
 			struct sockaddr *addr); ///< accept handler. Return false to refuse.
 
-	int	tmo_defer;  ///< defer accept timeout in millisecond. Use accepted_ops.tmo_read if not set.
+	int	defer;  ///< defer accept timeout in second. Use 10 if not set.
 	int	backlog;    ///< listen backlog. Use 1000 if not set.
 	bool	reuse_port; ///< if use SO_REUSEPORT. Default if false.
 } loop_tcp_listen_ops_t;
@@ -231,13 +236,18 @@ void loop_tcp_listen_set_app_data(loop_tcp_listen_t *tl, void *app_data);
 void *loop_tcp_listen_get_app_data(loop_tcp_listen_t *tl);
 
 /**
- * @brief Create a stream by connect to address on TCP.
+ * @brief Parse address and create a stream by connect on TCP.
  *
  * @param addr and default_port see libwuya/wuy_sockaddr.h:wuy_sockaddr_pton() for format.
  */
 loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
 		unsigned short default_port, const loop_stream_ops_t *ops);
 
+/**
+ * @brief Create a stream by connect to sockaddr on TCP.
+ */
+loop_stream_t *loop_tcp_connect_sockaddr(loop_t *loop, struct sockaddr *sa,
+		const loop_stream_ops_t *ops);
 
 /* == loop.inotify == */
 

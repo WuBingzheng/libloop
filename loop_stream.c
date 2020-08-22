@@ -301,6 +301,14 @@ loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *op
 	return s;
 }
 
+void loop_stream_set_timeout(loop_stream_t *s, int timeout_ms)
+{
+	if (s->timer == NULL) {
+		s->timer = loop_timer_new(s->loop, loop_stream_timeout_handler, s);
+	}
+	loop_timer_set_after(s->timer, timeout_ms);
+}
+
 void loop_stream_close(loop_stream_t *s)
 {
 	loop_stream_close_for(s, LOOP_STREAM_APP_CLOSE);
