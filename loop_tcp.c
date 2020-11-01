@@ -21,7 +21,7 @@ struct loop_tcp_listen_s {
 void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl)
 {
 	while (1) {
-		struct sockaddr client_addr;
+		struct sockaddr_storage client_addr;
 		int client_fd = wuy_tcp_accept(tl->fd, &client_addr);
 		if (client_fd < 0) {
 			if (errno != EAGAIN) {
@@ -34,7 +34,7 @@ void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl)
 				tl->accepted_ops, false);
 
 		if (tl->ops->on_accept) {
-			if (!tl->ops->on_accept(tl, s, &client_addr)) {
+			if (!tl->ops->on_accept(tl, s, (struct sockaddr *)&client_addr)) {
 				loop_stream_close(s);
 				continue;
 			}
@@ -54,11 +54,12 @@ loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 	}
 
 	/* socket listen */
-	struct sockaddr sa;
-	if (!wuy_sockaddr_pton(addr, &sa, 0)) {
+	struct sockaddr_storage ss;
+	if (!wuy_sockaddr_loads(addr, &ss, 0)) {
 		return NULL;
 	}
-	int fd = wuy_tcp_listen(&sa, ops->backlog ? ops->backlog : 1000, ops->reuse_port);
+	int fd = wuy_tcp_listen((struct sockaddr *)&ss,
+			ops->backlog ? ops->backlog : 1000, ops->reuse_port);
 	if (fd < 0) {
 		return NULL;
 	}
@@ -115,9 +116,9 @@ loop_stream_t *loop_tcp_connect_sockaddr(loop_t *loop, struct sockaddr *sa,
 loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
 		unsigned short default_port, const loop_stream_ops_t *ops)
 {
-	struct sockaddr sa;
-	if (!wuy_sockaddr_pton(addr, &sa, default_port)) {
+	struct sockaddr_storage ss;
+	if (!wuy_sockaddr_loads(addr, &ss, default_port)) {
 		return NULL;
 	}
-	return loop_tcp_connect_sockaddr(loop, &sa, ops);
+	return loop_tcp_connect_sockaddr(loop, (struct sockaddr *)&ss, ops);
 }
