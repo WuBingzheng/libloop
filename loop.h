@@ -42,17 +42,17 @@ void loop_run(loop_t *loop);
 void loop_kill(loop_t *loop);
 
 
-/* == loop.idle == */
+/* == loop.defer == */
 
 /**
- * @brief Idle handler type.
+ * @brief defer handler type.
  */
-typedef void loop_idle_f(void *data);
+typedef void loop_defer_f(void *data);
 
 /**
- * @brief Add an idle handler, which will be called at each loop iteration.
+ * @brief Add an defer handler, which will be called at each loop iteration.
  */
-bool loop_idle_add(loop_t *loop, loop_idle_f *func, void *data);
+bool loop_defer_add(loop_t *loop, loop_defer_f *func, void *data);
 
 
 /* == loop.stream == */

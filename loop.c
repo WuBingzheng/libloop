@@ -53,11 +53,11 @@ void loop_run(loop_t *loop)
 		/* call loop_event_handler() to handle events */
 		wuy_event_run(loop->event_ctx, loop_timer_next(loop->timer_ctx));
 
-		/* call loop_timer_expire() before loop_idle_run(), because
-		 * timers may make something that need the idles to cleanup. */
+		/* call loop_timer_expire() before loop_defer_run(), because
+		 * timers may make something that need the defers to cleanup. */
 		loop_timer_expire(loop->timer_ctx);
 
-		loop_idle_run(loop);
+		loop_defer_run(loop);
 	}
 }
 

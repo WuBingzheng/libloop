@@ -206,5 +206,5 @@ void loop_inotify_init(loop_t *loop)
 
 	wuy_list_init(&loop->inotify_defer_head);
 
-	loop_idle_add(loop, loop_inotify_clear_defer, &loop->inotify_defer_head);
+	loop_defer_add(loop, loop_inotify_clear_defer, &loop->inotify_defer_head);
 }

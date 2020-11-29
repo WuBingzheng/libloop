@@ -318,7 +318,7 @@ void loop_stream_init(loop_t *loop)
 {
 	wuy_list_init(&loop->stream_defer_head);
 
-	loop_idle_add(loop, loop_stream_clear_defer, &loop->stream_defer_head);
+	loop_defer_add(loop, loop_stream_clear_defer, &loop->stream_defer_head);
 }
 
 int loop_stream_fd(loop_stream_t *s)

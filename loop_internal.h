@@ -16,9 +16,9 @@
 #define LOOP_TYPE_STREAM	102
 #define LOOP_TYPE_INOTIFY	103
 
-/* idle */
-typedef struct loop_idle_s loop_idle_t;
-void loop_idle_run(loop_t *loop);
+/* defer */
+typedef struct loop_defer_s loop_defer_t;
+void loop_defer_run(loop_t *loop);
 
 /* stream */
 void loop_stream_init(loop_t *loop);
@@ -52,9 +52,9 @@ struct loop_s {
 	wuy_dict_t		*inside_inotify;
 	wuy_list_t		inotify_defer_head;
 
-	int			idle_count;
-	int			idle_capacity;
-	loop_idle_t		*idle_funcs;
+	int			defer_count;
+	int			defer_capacity;
+	loop_defer_t		*defer_funcs;
 };
 
 #endif
