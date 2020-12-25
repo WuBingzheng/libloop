@@ -44,7 +44,7 @@ void loop_tcp_listen_acceptable(loop_tcp_listen_t *tl)
 	}
 }
 
-loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
+loop_tcp_listen_t *loop_tcp_listen_fd(loop_t *loop, int fd,
 		const loop_tcp_listen_ops_t *ops,
 		const loop_stream_ops_t *accepted_ops)
 {
@@ -53,23 +53,9 @@ loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 		ops = &default_ops;
 	}
 
-	/* socket listen */
-	struct sockaddr_storage ss;
-	if (!wuy_sockaddr_loads(addr, &ss, 0)) {
-		return NULL;
-	}
-	int fd = wuy_tcp_listen((struct sockaddr *)&ss,
-			ops->backlog ? ops->backlog : 1000, ops->reuse_port);
-	if (fd < 0) {
-		return NULL;
-	}
-
-	wuy_tcp_set_defer_accept(fd, ops->defer ? ops->defer : 10);
-
 	/* add event */
 	loop_tcp_listen_t *tl = malloc(sizeof(loop_tcp_listen_t));
 	if (tl == NULL) {
-		close(fd);
 		return NULL;
 	}
 
@@ -84,6 +70,26 @@ loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 	wuy_event_add_read(loop->event_ctx, tl->fd, tl, &event_status);
 
 	return tl;
+}
+
+loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
+		const loop_tcp_listen_ops_t *ops,
+		const loop_stream_ops_t *accepted_ops)
+{
+	/* socket listen */
+	struct sockaddr_storage ss;
+	if (!wuy_sockaddr_loads(addr, &ss, 0)) {
+		return NULL;
+	}
+	int fd = wuy_tcp_listen((struct sockaddr *)&ss,
+			ops->backlog ? ops->backlog : 1000, ops->reuse_port);
+	if (fd < 0) {
+		return NULL;
+	}
+
+	wuy_tcp_set_defer_accept(fd, ops->defer ? ops->defer : 10);
+
+	return loop_tcp_listen_fd(loop, fd, ops, accepted_ops);
 }
 
 void loop_tcp_listen_set_app_data(loop_tcp_listen_t *tl, void *app_data)

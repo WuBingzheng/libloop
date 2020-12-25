@@ -14,7 +14,6 @@
 
 #define LOOP_TYPE_TCP_LISTEN	101
 #define LOOP_TYPE_STREAM	102
-#define LOOP_TYPE_INOTIFY	103
 
 /* defer */
 typedef struct loop_defer_s loop_defer_t;
@@ -33,10 +32,6 @@ void loop_timer_init(loop_t *loop);
 int64_t loop_timer_expire(loop_timer_ctx_t *ctx);
 int64_t loop_timer_next(loop_timer_ctx_t *ctx);
 
-/* inotify */
-void loop_inotify_init(loop_t *loop);
-void loop_inotify_event_handler(void *data);
-
 /* loop_t */
 struct loop_s {
 	unsigned		quit:1;
@@ -46,11 +41,6 @@ struct loop_s {
 	wuy_list_t		stream_defer_head;
 
 	loop_timer_ctx_t	*timer_ctx;
-
-	int			inotify_fd;
-	wuy_dict_t		*wd_inotify;
-	wuy_dict_t		*inside_inotify;
-	wuy_list_t		inotify_defer_head;
 
 	int			defer_count;
 	int			defer_capacity;

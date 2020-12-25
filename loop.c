@@ -20,30 +20,27 @@ static void loop_event_handler(void *data, bool readable, bool writable)
 	case LOOP_TYPE_STREAM:
 		loop_stream_event_handler(data, readable, writable);
 		break;
-	case LOOP_TYPE_INOTIFY:
-		loop_inotify_event_handler(data);
-		break;
 	default:
 		abort();
 	}
 }
 
+loop_t *loop_new_noev(void)
+{
+	loop_t *loop = calloc(1, sizeof(loop_t));
+	assert(loop != NULL);
+	loop_timer_init(loop);
+	loop_stream_init(loop);
+	return loop;
+}
+void loop_new_event(loop_t *loop)
+{
+	loop->event_ctx = wuy_event_ctx_new(loop_event_handler);
+}
 loop_t *loop_new(void)
 {
-	loop_t *loop = malloc(sizeof(loop_t));
-	assert(loop != NULL);
-
-	bzero(loop, sizeof(loop_t));
-
-	loop->event_ctx = wuy_event_ctx_new(loop_event_handler);
-	assert(loop->event_ctx != NULL);
-
-	loop_timer_init(loop);
-
-	loop_stream_init(loop);
-
-	loop_inotify_init(loop);
-
+	loop_t *loop = loop_new_noev();
+	loop_new_event(loop);
 	return loop;
 }
 

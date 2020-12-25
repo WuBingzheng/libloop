@@ -32,6 +32,22 @@ typedef struct loop_s loop_t;
 loop_t *loop_new(void);
 
 /**
+ * @brief Create a new loop without event.
+ *
+ * loop_new() is the normal way to create a loop. However if you want to
+ * duplicate the loop to children processes by fork(), since the epoll
+ * instance does not been duplicated, it must be create at children
+ * processes. In this case, loop_new_noev() creates a loop without the
+ * event, and loop_new_event() creates the event at children processes.
+ */
+loop_t *loop_new_noev(void);
+
+/**
+ * @brief Create the event.
+ */
+void loop_new_event(loop_t *loop);
+
+/**
  * @brief Start the loop.
  */
 void loop_run(loop_t *loop);
@@ -227,6 +243,13 @@ loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
 		const loop_stream_ops_t *accepted_ops);
 
 /**
+ * @brief Add a listen by fd.
+ */
+loop_tcp_listen_t *loop_tcp_listen_fd(loop_t *loop, int fd,
+		const loop_tcp_listen_ops_t *ops,
+		const loop_stream_ops_t *accepted_ops);
+
+/**
  * @brief Set application data to listen context.
  */
 void loop_tcp_listen_set_app_data(loop_tcp_listen_t *tl, void *app_data);
@@ -248,36 +271,6 @@ loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
  */
 loop_stream_t *loop_tcp_connect_sockaddr(loop_t *loop, struct sockaddr *sa,
 		const loop_stream_ops_t *ops);
-
-/* == loop.inotify == */
-
-#include <sys/inotify.h>
-
-/**
- * @brief Inotify context.
- */
-typedef struct loop_inotify_s loop_inotify_t;
-
-/**
- * @brief Inotify operations and settings.
- */
-typedef struct {
-	void (*on_notify)(loop_inotify_t *, const struct inotify_event *); ///< notify handler
-	void (*on_inside)(loop_inotify_t *, uint32_t mask, uint32_t cookie); ///< recursion in directory
-	void (*on_delete)(loop_inotify_t *); ///< delete handler
-	uint32_t	mask; ///< inotify mask
-} loop_inotify_ops_t;
-
-/**
- * @brief Add an inotify on pathname.
- */
-loop_inotify_t *loop_inotify_add(loop_t *loop, const char *pathname,
-		loop_inotify_ops_t *ops);
-
-/**
- * @brief Delete the inotify.
- */
-void loop_inotify_delete(loop_inotify_t *in);
 
 
 /* == loop.timer == */
