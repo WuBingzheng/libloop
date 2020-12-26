@@ -339,58 +339,56 @@ void loop_timer_delete(loop_timer_t *timer);
 typedef struct loop_group_timer_s loop_group_timer_t;
 
 /**
- * @brief Group timer node.
- *
- * The group-timer-node can be set to a group to enable timer.
+ * @brief Group timer head.
  */
-typedef struct loop_group_timer_node_s loop_group_timer_node_t;
+typedef struct loop_group_timer_head_s loop_group_timer_head_t;
 
 /**
- * @brief Create a new group timer.
+ * @brief Create a new group timer head.
  *
- * @param handler  called for each expired group-timer-node.
- * @param period  each added group-timer-node expires after this millisecond
+ * @param handler  called for each expired group-timer.
+ * @param period  each group-timer expires after this millisecond
  */
-loop_group_timer_t *loop_group_timer_new(loop_t *loop,
+loop_group_timer_head_t *loop_group_timer_head_new(loop_t *loop,
 		loop_timer_f *handler, int64_t period);
 
 /**
- * @brief Create a new group timer node.
+ * @brief Create a new group timer.
  */
-loop_group_timer_node_t *loop_group_timer_node_new(void *data);
+loop_group_timer_t *loop_group_timer_new(void *data);
 
 /**
- * @brief Set the node to group.
+ * @brief Set the timer to group.
  *
- * The node can be set to different groups.
+ * The timer can be set to different groups.
  *
- * If the node was alreay set to a group, this group or others,
+ * If the timer was alreay set to a group, this group or others,
  * it will be removed from that group first.
  */
-void loop_group_timer_node_set(loop_group_timer_t *group, loop_group_timer_node_t *node);
+void loop_group_timer_set(loop_group_timer_head_t *group, loop_group_timer_t *timer);
 
 /**
- * @brief Suspend the node.
+ * @brief Suspend the timer.
  */
-void loop_group_timer_node_suspend(loop_group_timer_node_t *node);
+void loop_group_timer_suspend(loop_group_timer_t *timer);
 
 /**
- * @brief Suspend and free the node.
+ * @brief Suspend and free the timer.
  */
-void loop_group_timer_node_delete(loop_group_timer_node_t *node);
+void loop_group_timer_delete(loop_group_timer_t *timer);
 
 /**
- * @brief Expire one group-timer-node at @at.
+ * @brief Expire one group-timer at @at.
  *
  * Return if expired.
  */
-bool loop_group_timer_expire_one_at(loop_group_timer_t *group, int64_t at);
+bool loop_group_timer_expire_one_at(loop_group_timer_head_t *group, int64_t at);
 
 /**
- * @brief Expire one group-timer-node ahead @ahead.
+ * @brief Expire one group-timer ahead @ahead.
  *
  * Return if expired.
  */
-bool loop_group_timer_expire_one_ahead(loop_group_timer_t *group, int64_t ahead);
+bool loop_group_timer_expire_one_ahead(loop_group_timer_head_t *group, int64_t ahead);
 
 #endif
