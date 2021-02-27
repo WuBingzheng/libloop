@@ -353,6 +353,11 @@ loop_group_timer_head_t *loop_group_timer_head_new(loop_t *loop,
 		loop_timer_f *handler, int64_t period);
 
 /**
+ * @brief Delete a group timer.
+ */
+void loop_group_timer_head_delete(loop_group_timer_head_t *group);
+
+/**
  * @brief Create a new group timer.
  */
 loop_group_timer_t *loop_group_timer_new(void *data);

@@ -90,6 +90,13 @@ loop_group_timer_head_t *loop_group_timer_head_new(loop_t *loop,
 	return group;
 }
 
+void loop_group_timer_head_delete(loop_group_timer_head_t *group)
+{
+	assert(!wuy_list_empty(&group->list_head));
+	loop_timer_delete(group->timer);
+	free(group);
+}
+
 loop_group_timer_t *loop_group_timer_new(void *data)
 {
 	loop_group_timer_t *timer = malloc(sizeof(loop_group_timer_t));
