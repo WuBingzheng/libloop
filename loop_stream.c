@@ -190,7 +190,7 @@ static void loop_stream_readable(loop_stream_t *s)
 
 void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 {
-	if (s->timer != NULL) {
+	if (s->ops->timeout_ms > 0) {
 		loop_timer_set_after(s->timer, s->ops->timeout_ms);
 	}
 
