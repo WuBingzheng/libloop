@@ -65,10 +65,7 @@ loop_tcp_listen_t *loop_tcp_listen_fd(loop_t *loop, int fd,
 	tl->accepted_ops = accepted_ops;
 	tl->loop = loop;
 
-	wuy_event_status_t event_status;
-	bzero(&event_status, sizeof(wuy_event_status_t));
-	wuy_event_add_read(loop->event_ctx, tl->fd, tl, &event_status);
-
+	wuy_event_add_listen(loop->event_ctx, tl->fd, tl);
 	return tl;
 }
 
