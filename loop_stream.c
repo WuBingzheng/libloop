@@ -205,6 +205,10 @@ void loop_stream_event_handler(loop_stream_t *s, bool readable, bool writable)
 		if (s->closed) {
 			return;
 		}
+		if (s->ops->on_writable == NULL) {
+			loop_stream_close_for(s, LOOP_STREAM_WRITE_BLOCK);
+			return;
+		}
 		s->write_blocked = false;
 		s->ops->on_writable(s);
 	}
