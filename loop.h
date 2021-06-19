@@ -67,9 +67,19 @@ typedef void loop_defer_f(void *data);
 
 /**
  * @brief Add an defer handler, which will be called at each loop iteration.
+ *
+ * All defer handlers are sorted by rank. So if you want your handler to be
+ * executed later, set a bigger rank. And a smaller rank for earlier.
  */
-bool loop_defer_add(loop_t *loop, loop_defer_f *func, void *data);
+bool loop_defer_add4(loop_t *loop, loop_defer_f *func, void *data, float rank);
 
+/**
+ * @brief Same with loop_defer_add4() while set rank=0.
+ */
+static inline bool loop_defer_add(loop_t *loop, loop_defer_f *func, void *data)
+{
+	return loop_defer_add4(loop, func, data, 0);
+}
 
 /* == loop.stream == */
 

@@ -42,9 +42,7 @@ struct loop_s {
 
 	loop_timer_ctx_t	*timer_ctx;
 
-	int			defer_count;
-	int			defer_capacity;
-	loop_defer_t		*defer_funcs;
+	wuy_list_t		defer_head;
 };
 
 #endif
