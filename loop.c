@@ -29,6 +29,7 @@ loop_t *loop_new_noev(void)
 {
 	loop_t *loop = calloc(1, sizeof(loop_t));
 	assert(loop != NULL);
+	loop_defer_init(loop);
 	loop_timer_init(loop);
 	loop_stream_init(loop);
 	return loop;

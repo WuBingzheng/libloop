@@ -10,6 +10,11 @@ struct loop_defer_s {
 	float		rank;
 };
 
+void loop_defer_init(loop_t *loop)
+{
+	wuy_list_init(&loop->defer_head);
+}
+
 bool loop_defer_add4(loop_t *loop, loop_defer_f *func, void *data, float rank)
 {
 	loop_defer_t *defer = malloc(sizeof(loop_defer_t));

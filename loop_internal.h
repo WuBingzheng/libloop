@@ -17,6 +17,7 @@
 
 /* defer */
 typedef struct loop_defer_s loop_defer_t;
+void loop_defer_init(loop_t *loop);
 void loop_defer_run(loop_t *loop);
 
 /* stream */
