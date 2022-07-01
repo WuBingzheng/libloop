@@ -54,6 +54,9 @@ static int64_t loop_stream_write_timeout(int64_t at, void *data)
 }
 static void loop_stream_set_timer_read(loop_stream_t *s)
 {
+	if (s->ops->tmo_read == 0) {
+		return;
+	}
 	if (s->timer_read == NULL) {
 		s->timer_read = loop_timer_new(s->loop, loop_stream_read_timeout, s);
 	}
@@ -61,6 +64,9 @@ static void loop_stream_set_timer_read(loop_stream_t *s)
 }
 static void loop_stream_set_timer_write(loop_stream_t *s)
 {
+	if (s->ops->tmo_write == 0) {
+		return;
+	}
 	if (s->timer_write == NULL) {
 		s->timer_write = loop_timer_new(s->loop, loop_stream_write_timeout, s);
 	}
@@ -163,6 +169,9 @@ static void loop_stream_readable(loop_stream_t *s)
 		}
 		if (proc_len > read_len) {
 			loop_stream_close_for(s, "app read invalid return", 0);
+			return;
+		}
+		if (s->closed) {
 			return;
 		}
 
