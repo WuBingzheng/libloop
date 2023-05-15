@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "wuy_event.h"
+#include "wuy_pool.h"
 #include "wuy_list.h"
 
 #include "loop_internal.h"
@@ -20,42 +21,47 @@ static void loop_event_handler(void *data, bool readable, bool writable)
 	case LOOP_TYPE_STREAM:
 		loop_stream_event_handler(data, readable, writable);
 		break;
+	case LOOP_TYPE_INOTIFY:
+		loop_inotify_event_handler(data);
+		break;
+	case LOOP_TYPE_CHANNEL:
+		loop_channel_poll_handler(data);
+		break;
 	default:
 		abort();
 	}
 }
 
-loop_t *loop_new_noev(void)
-{
-	loop_t *loop = calloc(1, sizeof(loop_t));
-	assert(loop != NULL);
-	loop_defer_init(loop);
-	loop_timer_init(loop);
-	loop_stream_init(loop);
-	return loop;
-}
-void loop_new_event(loop_t *loop)
-{
-	loop->event_ctx = wuy_event_ctx_new(loop_event_handler);
-}
 loop_t *loop_new(void)
 {
-	loop_t *loop = loop_new_noev();
-	loop_new_event(loop);
+	loop_t *loop = malloc(sizeof(loop_t));
+	assert(loop != NULL);
+
+	bzero(loop, sizeof(loop_t));
+
+	loop->event_ctx = wuy_event_ctx_new(loop_event_handler);
+	assert(loop->event_ctx != NULL);
+
+	loop_timer_init(loop);
+
+	loop_stream_init(loop);
+
+	loop_inotify_init(loop);
+
 	return loop;
 }
 
 void loop_run(loop_t *loop)
 {
 	while (!loop->quit) {
+		/* expire and get the latest timeout */
+		int64_t timeout = loop_timer_expire(loop->timer_ctx);
+
 		/* call loop_event_handler() to handle events */
-		wuy_event_run(loop->event_ctx, loop_timer_next(loop->timer_ctx));
+		wuy_event_run(loop->event_ctx, timeout);
 
-		/* call loop_timer_expire() before loop_defer_run(), because
-		 * timers may make something that need the defers to cleanup. */
-		loop_timer_expire(loop->timer_ctx);
-
-		loop_defer_run(loop);
+		/* idle functions */
+		loop_idle_run(loop);
 	}
 }
 

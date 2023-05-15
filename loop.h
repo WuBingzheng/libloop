@@ -15,6 +15,7 @@
 #define LOOP_H
 
 #include <stddef.h>
+#include <unistd.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -32,22 +33,6 @@ typedef struct loop_s loop_t;
 loop_t *loop_new(void);
 
 /**
- * @brief Create a new loop without event.
- *
- * loop_new() is the normal way to create a loop. However if you want to
- * duplicate the loop to children processes by fork(), since the epoll
- * instance does not been duplicated, it must be create at children
- * processes. In this case, loop_new_noev() creates a loop without the
- * event, and loop_new_event() creates the event at children processes.
- */
-loop_t *loop_new_noev(void);
-
-/**
- * @brief Create the event.
- */
-void loop_new_event(loop_t *loop);
-
-/**
  * @brief Start the loop.
  */
 void loop_run(loop_t *loop);
@@ -58,28 +43,18 @@ void loop_run(loop_t *loop);
 void loop_kill(loop_t *loop);
 
 
-/* == loop.defer == */
+/* == loop.idle == */
 
 /**
- * @brief defer handler type.
+ * @brief Idle handler type.
  */
-typedef void loop_defer_f(void *data);
+typedef void loop_idle_f(void *data);
 
 /**
- * @brief Add an defer handler, which will be called at each loop iteration.
- *
- * All defer handlers are sorted by rank. So if you want your handler to be
- * executed later, set a bigger rank. And a smaller rank for earlier.
+ * @brief Add an idle handler, which will be called at each loop iteration.
  */
-bool loop_defer_add4(loop_t *loop, loop_defer_f *func, void *data, float rank);
+bool loop_idle_add(loop_t *loop, loop_idle_f *func, void *data);
 
-/**
- * @brief Same with loop_defer_add4() while set rank=0.
- */
-static inline bool loop_defer_add(loop_t *loop, loop_defer_f *func, void *data)
-{
-	return loop_defer_add4(loop, func, data, 0);
-}
 
 /* == loop.stream == */
 
@@ -89,28 +64,6 @@ static inline bool loop_defer_add(loop_t *loop, loop_defer_f *func, void *data)
 typedef struct loop_stream_s loop_stream_t;
 
 /**
- * @brief Reasons of stream close, used by loop_stream_ops_t.on_close().
- */
-enum loop_stream_close_reason {
-	LOOP_STREAM_APP_CLOSE = 1,
-	LOOP_STREAM_TIMEOUT,
-	LOOP_STREAM_READ_ERROR,
-	LOOP_STREAM_PEER_CLOSE,
-	LOOP_STREAM_APP_READ_ERROR,
-	LOOP_STREAM_APP_INVALID_RETURN,
-	LOOP_STREAM_READ_BUFFER_FULL,
-	LOOP_STREAM_WRITE_BLOCK,
-	LOOP_STREAM_WRITE_ERROR,
-	LOOP_STREAM_SENDFILE_ERROR,
-	LOOP_STREAM_CLOSED_YET,
-};
-
-/**
- * @brief Explain close reason to string.
- */
-const char *loop_stream_close_string(enum loop_stream_close_reason reason);
-
-/**
  * @brief Stream type operations and settings.
  *
  * field:on_read() should return the processed data length. If the returned
@@ -118,28 +71,23 @@ const char *loop_stream_close_string(enum loop_stream_close_reason reason);
  * not-processed data will be saved and passed in the next time.
  * If returns negetive (e.g. invalid message), the connection will be closed.
  *
- * field:on_read() or field:on_readable() is the only mandatory member you must set.
+ * field:on_read() is the only mandatory member you must set.
  */
 typedef struct {
-	int	(*on_read)(loop_stream_t *, void *data, int len); ///< read available handler
-	void	(*on_close)(loop_stream_t *, enum loop_stream_close_reason); ///< close handler
-	void	(*on_readable)(loop_stream_t *); ///< read available handler, used with loop_stream_read()
+	ssize_t	(*on_read)(loop_stream_t *, void *data, size_t len); ///< read available handler
+	void	(*on_close)(loop_stream_t *, const char *reason, int errnum); ///< close handler
 	void	(*on_writable)(loop_stream_t *); ///< write available handler, used with loop_stream_write()
-
-	int	(*underlying_read)(void *underlying, void *buffer, int len);
-	int	(*underlying_write)(void *underlying, const void *data, int len);
-	void	(*underlying_close)(void *underlying);
 
 	int	bufsz_read; ///< read buffer size. Use 16K if not set.
 
-	int	timeout_ms;   ///< active timeout in millisecond. Set 0 to disable.
+	int	tmo_read;   ///< read timeout in millisecond. Use 10*1000 if not set.
+	int	tmo_write;  ///< write timeout in millisecond. Use 10*1000 if not set.
 } loop_stream_ops_t;
 
 /**
- * @brief Create a stream.
+ * @brief Add a stream fd, which can be pipe or tcp connection.
  */
-loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *ops,
-		bool write_blocked);
+loop_stream_t *loop_stream_add(loop_t *loop, int fd, loop_stream_ops_t *ops);
 
 /**
  * @brief Write data to stream.
@@ -152,28 +100,14 @@ loop_stream_t *loop_stream_new(loop_t *loop, int fd, const loop_stream_ops_t *op
  * is set, this returns the writen data length (maybe 0), and the application
  * should save the un-writen data, and re-send it in ops.on_writable().
  */
-int loop_stream_write(loop_stream_t *, const void *data, int len);
+ssize_t loop_stream_write(loop_stream_t *, const void *data, size_t len);
 
 /**
  * @brief Write data to stream by sendfile().
  *
  * Return the same with loop_stream_write().
  */
-int loop_stream_sendfile(loop_stream_t *, int in_fd, off_t *offset, int len);
-
-/**
- * @brief Read data from stream. This should be called in ops->on_readable().
- *
- * Return <0 if connection error or closed;
- * Return =0 if read blocked;
- * Return >0 as read length.
- */
-int loop_stream_read(loop_stream_t *s, void *buffer, int buf_len);
-
-/**
- * @brief Set timer.
- */
-void loop_stream_set_timeout(loop_stream_t *s, int timeout_ms);
+ssize_t loop_stream_sendfile(loop_stream_t *, int in_fd, off_t *offset, size_t len);
 
 /**
  * @brief Close a stream.
@@ -186,21 +120,6 @@ void loop_stream_close(loop_stream_t *);
 int loop_stream_fd(loop_stream_t *s);
 
 /**
- * @brief Return if stream's closed.
- */
-bool loop_stream_is_closed(loop_stream_t *s);
-
-/**
- * @brief Return if stream's read-blocked.
- */
-bool loop_stream_is_read_blocked(loop_stream_t *s);
-
-/**
- * @brief Return if stream's write blocked.
- */
-bool loop_stream_is_write_blocked(loop_stream_t *s);
-
-/**
  * @brief Set application data to stream.
  */
 void loop_stream_set_app_data(loop_stream_t *s, void *app_data);
@@ -209,16 +128,6 @@ void loop_stream_set_app_data(loop_stream_t *s, void *app_data);
  */
 void *loop_stream_get_app_data(loop_stream_t *s);
 
-/**
- * @brief Set stream's underlying context.
- *
- * Make sure that stream's ops->underlying_*() are set.
- */
-void loop_stream_set_underlying(loop_stream_t *s, void *underlying);
-/**
- * @brief Get stream's underlying context.
- */
-void *loop_stream_get_underlying(loop_stream_t *s);
 
 /* == loop.tcp == */
 
@@ -236,7 +145,7 @@ typedef struct {
 	bool	(*on_accept)(loop_tcp_listen_t *, loop_stream_t *,
 			struct sockaddr *addr); ///< accept handler. Return false to refuse.
 
-	int	defer;  ///< defer accept timeout in second. Use 10 if not set.
+	int	tmo_defer;  ///< defer accept timeout in millisecond. Use accepted_ops.tmo_read if not set.
 	int	backlog;    ///< listen backlog. Use 1000 if not set.
 	bool	reuse_port; ///< if use SO_REUSEPORT. Default if false.
 } loop_tcp_listen_ops_t;
@@ -249,15 +158,7 @@ typedef struct {
  * @param accepted_ops is applied for accepted connections.
  */
 loop_tcp_listen_t *loop_tcp_listen(loop_t *loop, const char *addr,
-		const loop_tcp_listen_ops_t *ops,
-		const loop_stream_ops_t *accepted_ops);
-
-/**
- * @brief Add a listen by fd.
- */
-loop_tcp_listen_t *loop_tcp_listen_fd(loop_t *loop, int fd,
-		const loop_tcp_listen_ops_t *ops,
-		const loop_stream_ops_t *accepted_ops);
+		loop_tcp_listen_ops_t *ops, loop_stream_ops_t *accepted_ops);
 
 /**
  * @brief Set application data to listen context.
@@ -269,18 +170,43 @@ void loop_tcp_listen_set_app_data(loop_tcp_listen_t *tl, void *app_data);
 void *loop_tcp_listen_get_app_data(loop_tcp_listen_t *tl);
 
 /**
- * @brief Parse address and create a stream by connect on TCP.
+ * @brief Create a stream by connect to address on TCP.
  *
  * @param addr and default_port see libwuya/wuy_sockaddr.h:wuy_sockaddr_pton() for format.
  */
 loop_stream_t *loop_tcp_connect(loop_t *loop, const char *addr,
-		unsigned short default_port, const loop_stream_ops_t *ops);
+		unsigned short default_port, loop_stream_ops_t *ops);
+
+
+/* == loop.inotify == */
+
+#include <sys/inotify.h>
 
 /**
- * @brief Create a stream by connect to sockaddr on TCP.
+ * @brief Inotify context.
  */
-loop_stream_t *loop_tcp_connect_sockaddr(loop_t *loop, struct sockaddr *sa,
-		const loop_stream_ops_t *ops);
+typedef struct loop_inotify_s loop_inotify_t;
+
+/**
+ * @brief Inotify operations and settings.
+ */
+typedef struct {
+	void (*on_notify)(loop_inotify_t *, const struct inotify_event *); ///< notify handler
+	void (*on_inside)(loop_inotify_t *, uint32_t mask, uint32_t cookie); ///< recursion in directory
+	void (*on_delete)(loop_inotify_t *); ///< delete handler
+	uint32_t	mask; ///< inotify mask
+} loop_inotify_ops_t;
+
+/**
+ * @brief Add an inotify on pathname.
+ */
+loop_inotify_t *loop_inotify_add(loop_t *loop, const char *pathname,
+		loop_inotify_ops_t *ops);
+
+/**
+ * @brief Delete the inotify.
+ */
+void loop_inotify_delete(loop_inotify_t *in);
 
 
 /* == loop.timer == */
@@ -318,92 +244,22 @@ bool loop_timer_set_at(loop_timer_t *timer, int64_t at);
 bool loop_timer_set_after(loop_timer_t *timer, int64_t after);
 
 /**
- * @brief Suspend the timer.
- */
-void loop_timer_suspend(loop_timer_t *timer);
-
-/**
  * @brief Delete the timer.
  */
 void loop_timer_delete(loop_timer_t *timer);
 
 
-/* == loop.group_timer == */
+typedef struct loop_channel_s loop_channel_t;
 
-/**
- * @brief Group timer.
- *
- * The timers that have the same expiration time can be a group, and
- * loop.group_timer is useful here.
- *
- * loop.timer is OK, however loop.group_timer is better in some cases.
- *
- * loop.timer is managed by a heap which need a continuously memory.
- * The memory may grow big if may timers. There are also memory copy
- * during the growing. Besides the timer's time complexity is O(logN).
- *
- * While loop.group_timer is managed by a list. So continuously memory
- * is not need, and the complexity is O(1). If your program uses many
- * timers, loop.group_timer worth a shot.
- */
-typedef struct loop_group_timer_s loop_group_timer_t;
+typedef void loop_channel_on_receive_f(void *job);
 
-/**
- * @brief Group timer head.
- */
-typedef struct loop_group_timer_head_s loop_group_timer_head_t;
+loop_channel_t *loop_channel_new_receiver(loop_t *loop, size_t capacity,
+		loop_channel_on_receive_f *on_receive);
 
-/**
- * @brief Create a new group timer head.
- *
- * @param handler  called for each expired group-timer.
- * @param period  each group-timer expires after this millisecond
- */
-loop_group_timer_head_t *loop_group_timer_head_new(loop_t *loop,
-		loop_timer_f *handler, int64_t period);
+void loop_channel_add_sender(loop_t *loop, loop_channel_t *);
 
-/**
- * @brief Delete a group timer.
- */
-void loop_group_timer_head_delete(loop_group_timer_head_t *group);
+bool loop_channel_send(loop_channel_t *ch, void *data);
 
-/**
- * @brief Create a new group timer.
- */
-loop_group_timer_t *loop_group_timer_new(void *data);
-
-/**
- * @brief Set the timer to group.
- *
- * The timer can be set to different groups.
- *
- * If the timer was alreay set to a group, this group or others,
- * it will be removed from that group first.
- */
-void loop_group_timer_set(loop_group_timer_head_t *group, loop_group_timer_t *timer);
-
-/**
- * @brief Suspend the timer.
- */
-void loop_group_timer_suspend(loop_group_timer_t *timer);
-
-/**
- * @brief Suspend and free the timer.
- */
-void loop_group_timer_delete(loop_group_timer_t *timer);
-
-/**
- * @brief Expire one group-timer at @at.
- *
- * Return if expired.
- */
-bool loop_group_timer_expire_one_at(loop_group_timer_head_t *group, int64_t at);
-
-/**
- * @brief Expire one group-timer ahead @ahead.
- *
- * Return if expired.
- */
-bool loop_group_timer_expire_one_ahead(loop_group_timer_head_t *group, int64_t ahead);
+size_t loop_channel_len(loop_channel_t *ch);
 
 #endif
