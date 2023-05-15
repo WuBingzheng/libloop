@@ -248,4 +248,18 @@ bool loop_timer_set_after(loop_timer_t *timer, int64_t after);
  */
 void loop_timer_delete(loop_timer_t *timer);
 
+
+typedef struct loop_channel_s loop_channel_t;
+
+typedef void loop_channel_on_receive_f(void *job);
+
+loop_channel_t *loop_channel_new_receiver(loop_t *loop, size_t capacity,
+		loop_channel_on_receive_f *on_receive);
+
+void loop_channel_add_sender(loop_t *loop, loop_channel_t *);
+
+bool loop_channel_send(loop_channel_t *ch, void *data);
+
+size_t loop_channel_len(loop_channel_t *ch);
+
 #endif

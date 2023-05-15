@@ -24,6 +24,9 @@ static void loop_event_handler(void *data, bool readable, bool writable)
 	case LOOP_TYPE_INOTIFY:
 		loop_inotify_event_handler(data);
 		break;
+	case LOOP_TYPE_CHANNEL:
+		loop_channel_poll_handler(data);
+		break;
 	default:
 		abort();
 	}

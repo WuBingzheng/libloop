@@ -15,6 +15,7 @@
 #define LOOP_TYPE_TCP_LISTEN	101
 #define LOOP_TYPE_STREAM	102
 #define LOOP_TYPE_INOTIFY	103
+#define LOOP_TYPE_CHANNEL	104
 
 /* idle */
 typedef struct loop_idle_s loop_idle_t;
@@ -36,6 +37,9 @@ int64_t loop_timer_expire(loop_timer_ctx_t *ctx);
 /* inotify */
 void loop_inotify_init(loop_t *loop);
 void loop_inotify_event_handler(void *data);
+
+/* channel */
+void loop_channel_poll_handler(loop_channel_t *ch);
 
 /* loop_t */
 struct loop_s {
