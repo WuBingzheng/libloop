@@ -253,10 +253,8 @@ typedef struct loop_channel_s loop_channel_t;
 
 typedef void loop_channel_on_receive_f(void *job);
 
-loop_channel_t *loop_channel_new_receiver(loop_t *loop, size_t capacity,
+loop_channel_t *loop_channel_new(loop_t *loop, size_t capacity,
 		loop_channel_on_receive_f *on_receive);
-
-void loop_channel_add_sender(loop_t *loop, loop_channel_t *);
 
 bool loop_channel_send(loop_channel_t *ch, void *data);
 
